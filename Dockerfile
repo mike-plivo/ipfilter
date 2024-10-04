@@ -9,6 +9,11 @@ COPY go.mod go.sum* ./
 
 # Download dependencies
 RUN go mod download
+# Generate go.mod if it doesn't exist
+RUN if [ ! -f go.mod ]; then \
+    go mod init github.com/mike-plivo/ipfilter && \
+    go mod tidy \
+    ; fi
 
 # Copy the entire project
 COPY . .

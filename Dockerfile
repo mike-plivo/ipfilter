@@ -17,10 +17,10 @@ RUN go mod tidy || true
 COPY . .
 
 # Run all test cases
-RUN go test ./...
 
 # Build the application
-RUN go build -o example1 examples/example1.go
+#RUN go build -o example1 examples/example1.go
 
 # Command to run the executable
-CMD ["./example1"]
+#CMD ["./example1"]
+CMD ["go test ./..."]

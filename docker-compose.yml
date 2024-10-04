@@ -1,9 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      args:
-        - REDIS_URL=redis:6379
+    build: ./
     environment:
       - REDIS_URL=redis:6379
     depends_on:

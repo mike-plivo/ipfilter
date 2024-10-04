@@ -134,7 +134,7 @@ func TestGetRuleAtPosition(t *testing.T) {
 
 func TestUpdatePositions(t *testing.T) {
 	filter := NewIPFilter(getRedisURL())
-
+	var err error
 	// Add some rules
 	rules := []Rule{
 		{Action: "allow", Target: "93.184.216.0/24"},

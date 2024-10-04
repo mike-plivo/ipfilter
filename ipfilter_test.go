@@ -3,13 +3,14 @@ package ipfilter
 import (
 	"os"
 	"testing"
+	"log"
 	"github.com/stretchr/testify/assert"
 )
 
 func getRedisURL() string {
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		os.Exit(1)
+		log.Fatalf("REDIS_URL is not set")
 	}
 	return redisURL
 }

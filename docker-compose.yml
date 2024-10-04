@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    build: ./app
+    build: ./
     environment:
       - REDIS_URL=redis://redis:6379
     depends_on:

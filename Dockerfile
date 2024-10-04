@@ -22,7 +22,7 @@ COPY . .
 RUN go test ./...
 
 # Build the application
-RUN go build -o main .
+RUN go build -o example1 examples/example1.go
 
 # Command to run the executable
-CMD ["./main"]
+CMD ["./example1"]

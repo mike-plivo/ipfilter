@@ -2,6 +2,7 @@ package ipfilter
 
 import (
 	"testing"
+	"os"
 	"github.com/go-redis/redis/v8"
 )
 

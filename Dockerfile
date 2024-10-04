@@ -23,4 +23,4 @@ COPY . .
 
 # Command to run the executable
 #CMD ["./example1"]
-CMD ["go test ./..."]
+CMD ["/usr/local/go/bin/go", "test", "./..."]

@@ -101,6 +101,7 @@ func TestValidateRule(t *testing.T) {
 
 func TestGetRuleAtPosition(t *testing.T) {
 	filter := NewIPFilter(getRedisURL())
+	var err error
 
 	// Add some rules
 	rules := []Rule{

@@ -1,266 +1,397 @@
 package ipfilter
 
 import (
-	"testing"
 	"os"
+	"testing"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestIPFilter(t *testing.T) {
+func getRedisURL() string {
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		t.Fatal("REDIS_URL environment variable is not set")
+		redisURL = "redis://localhost:6379" // Default URL if not set
 	}
-	filter := NewIPFilter(redisURL)
-
-	// Test case 1: First matching rule should be applied
-	testRules1 := []Rule{
-		{Action: "allow", Target: "192.168.0.0/16"},
-		{Action: "deny", Target: "192.168.1.0/24"},
-		{Action: "allow", Target: "192.168.1.100"},
-		{Action: "deny", Target: "10.0.0.0/8"},
-		{Action: "allow", Target: "10.1.0.0/16"},
-		{Action: "allow", Target: "2001:db8::/32"},
-		{Action: "deny", Target: "2001:db8:1111::/48"},
-	}
-
-	testCases1 := []struct {
-		ip       string
-		expected bool
-	}{
-		{"192.168.0.1", true},    // Matches first rule (allow)
-		{"192.168.1.1", false},   // Matches second rule (deny)
-		{"192.168.1.100", false}, // Matches second rule (deny), not third
-		{"192.168.2.1", true},    // Matches first rule (allow)
-		{"10.0.1.1", false},      // Matches fourth rule (deny)
-		{"10.1.0.1", false},      // Matches fourth rule (deny), not fifth
-		{"172.16.0.1", false},    // Doesn't match any rule, default deny
-		{"2001:db8::1", true},    // Matches sixth rule (allow)
-		{"2001:db8:1111::1", true}, // Matches sixth rule (allow), not seventh
-		{"2001:db8:2222::1", true}, // Matches sixth rule (allow)
-		{"2001:db9::1", false},   // Doesn't match any rule, default deny
-	}
-
-	runTestCase(t, filter, testRules1, testCases1)
-
-	// Test case 2: Empty rules (should deny all traffic)
-	testRules2 := []Rule{}
-
-	testCases2 := []struct {
-		ip       string
-		expected bool
-	}{
-		{"8.8.8.8", false},
-		{"192.168.1.1", false},
-		{"2001:db8::1", false},
-		{"fe80::1234", false},
-	}
-
-	runTestCase(t, filter, testRules2, testCases2)
-
-	// Test case 3: Single "deny all" rule
-	testRules3 := []Rule{
-		{Action: "deny", Target: "all"},
-	}
-
-	testCases3 := []struct {
-		ip       string
-		expected bool
-	}{
-		{"8.8.8.8", false},
-		{"192.168.1.1", false},
-		{"2001:db8::1", false},
-		{"fe80::1234", false},
-	}
-
-	runTestCase(t, filter, testRules3, testCases3)
-
-	// Test case 4: Only "allow all" rule
-	testRules4 := []Rule{
-		{Action: "allow", Target: "all"},
-	}
-
-	testCases4 := []struct {
-		ip       string
-		expected bool
-	}{
-		{"192.168.1.1", true},
-		{"2001:db8::1", true},
-		{"8.8.8.8", true},
-		{"10.0.0.1", true},
-	}
-
-	runTestCase(t, filter, testRules4, testCases4)
-
-	// Test case 5: Mixed rules with "allow all" at the end
-	testRules5 := []Rule{
-		{Action: "deny", Target: "192.168.0.0/16"},
-		{Action: "allow", Target: "192.168.1.0/24"},
-		{Action: "deny", Target: "2001:db8::/32"},
-		{Action: "allow", Target: "all"},
-	}
-
-	testCases5 := []struct {
-		ip       string
-		expected bool
-	}{
-		{"192.168.0.1", false},  // Matches first rule (deny)
-		{"192.168.1.1", true},   // Matches second rule (allow)
-		{"192.168.2.1", false},  // Matches first rule (deny)
-		{"2001:db8::1", false},  // Matches third rule (deny)
-		{"2001:db9::1", true},   // Matches last rule (allow all)
-		{"8.8.8.8", true},       // Matches last rule (allow all)
-	}
-
-	runTestCase(t, filter, testRules5, testCases5)
+	return redisURL
 }
 
-func runTestCase(t *testing.T, filter *IPFilter, rules []Rule, testCases []struct {
-	ip       string
-	expected bool
-}) {
-	// Clear existing rules
-	ctx := filter.client.Context()
-	filter.client.Del(ctx, "ip_rules")
+func TestIPFilter(t *testing.T) {
+	filter := NewIPFilter(getRedisURL())
 
-	// Add test rules
-	for _, rule := range rules {
-		err := filter.AddRule(rule)
-		if err != nil {
-			t.Errorf("Failed to add rule: %v", err)
-		}
+	// Test adding rules
+	rule1 := Rule{Action: "allow", Target: "93.184.216.0/24"}
+	rule2 := Rule{Action: "deny", Target: "8.8.8.8"}
+	
+	_, err := filter.AppendRule(rule1)
+	assert.NoError(t, err)
+	
+	_, err = filter.AppendRule(rule2)
+	assert.NoError(t, err)
+
+	// Test getting all rules
+	rules, err := filter.GetAllRules()
+	assert.NoError(t, err)
+	assert.Len(t, rules, 2)
+	assert.Equal(t, rule1.Action, rules[0].Action)
+	assert.Equal(t, rule1.Target, rules[0].Target)
+	assert.Equal(t, rule2.Action, rules[1].Action)
+	assert.Equal(t, rule2.Target, rules[1].Target)
+
+	// Test IsAllowedIP
+	allowed, err := filter.IsAllowedIP("93.184.216.34")
+	assert.NoError(t, err)
+	assert.True(t, allowed)
+
+	allowed, err = filter.IsAllowedIP("8.8.8.8")
+	assert.NoError(t, err)
+	assert.False(t, allowed)
+
+	// Test adding a rule at a specific position
+	rule3 := Rule{Action: "allow", Target: "2606:2800:220:1:248:1893:25c8:1946/64"}
+	err = filter.AddRuleAtPosition(rule3, 1)
+	assert.NoError(t, err)
+
+	// Verify the new rule was added at the correct position
+	ruleAtPos, err := filter.GetRuleAtPosition(1)
+	assert.NoError(t, err)
+	assert.Equal(t, rule3.Action, ruleAtPos.Action)
+	assert.Equal(t, rule3.Target, ruleAtPos.Target)
+
+	// Test removing a rule at a specific position
+	err = filter.RemoveRuleAtPosition(0)
+	assert.NoError(t, err)
+
+	// Verify the rule was removed
+	ruleCount, err := filter.GetRuleCount()
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), ruleCount)
+
+	// Test removing all rules
+	err = filter.RemoveAllRules()
+	assert.NoError(t, err)
+
+	// Verify all rules were removed
+	ruleCount, err = filter.GetRuleCount()
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), ruleCount)
+}
+
+func TestValidateRule(t *testing.T) {
+	validRules := []Rule{
+		{Action: "allow", Target: "93.184.216.0/24"},
+		{Action: "deny", Target: "8.8.8.8"},
+		{Action: "allow", Target: "all"},
 	}
 
-	// Run test cases
+	for _, rule := range validRules {
+		err := ValidateRule(rule)
+		assert.NoError(t, err)
+	}
+
+	invalidRules := []Rule{
+		{Action: "invalid", Target: "93.184.216.0/24"},
+		{Action: "allow", Target: ""},
+		{Action: "", Target: "8.8.8.8"},
+	}
+
+	for _, rule := range invalidRules {
+		err := ValidateRule(rule)
+		assert.Error(t, err)
+	}
+}
+
+func TestGetRuleAtPosition(t *testing.T) {
+	filter := NewIPFilter(getRedisURL())
+
+	// Add some rules
+	rules := []Rule{
+		{Action: "allow", Target: "93.184.216.0/24"},
+		{Action: "deny", Target: "8.8.8.8"},
+		{Action: "allow", Target: "2606:2800:220:1:248:1893:25c8:1946/64"},
+	}
+
+	for _, rule := range rules {
+		_, err := filter.AppendRule(rule)
+		assert.NoError(t, err)
+	}
+
+	// Test getting rules at valid positions
+	for i, expectedRule := range rules {
+		rule, err := filter.GetRuleAtPosition(i)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedRule.Action, rule.Action)
+		assert.Equal(t, expectedRule.Target, rule.Target)
+		assert.Equal(t, i, rule.Position)
+	}
+
+	// Test getting rule at invalid position
+	_, err = filter.GetRuleAtPosition(-1)
+	assert.Error(t, err)
+
+	_, err = filter.GetRuleAtPosition(len(rules))
+	assert.Error(t, err)
+}
+
+func TestUpdatePositions(t *testing.T) {
+	filter := NewIPFilter(getRedisURL())
+
+	// Add some rules
+	rules := []Rule{
+		{Action: "allow", Target: "93.184.216.0/24"},
+		{Action: "deny", Target: "8.8.8.8"},
+		{Action: "allow", Target: "2606:2800:220:1:248:1893:25c8:1946/64"},
+	}
+
+	for _, rule := range rules {
+		_, err := filter.AppendRule(rule)
+		assert.NoError(t, err)
+	}
+
+	// Remove a rule from the middle
+	err = filter.RemoveRuleAtPosition(1)
+	assert.NoError(t, err)
+
+	// Verify positions are updated
+	updatedRules, err := filter.GetAllRules()
+	assert.NoError(t, err)
+	assert.Len(t, updatedRules, 2)
+	assert.Equal(t, 0, updatedRules[0].Position)
+	assert.Equal(t, 1, updatedRules[1].Position)
+}
+
+func TestExtendedIPFilter(t *testing.T) {
+	filter := NewIPFilter(getRedisURL())
+
+	testCases := []struct {
+		name     string
+		rules    []Rule
+		testIPs  []string
+		expected []bool
+	}{
+		{
+			name:     "Empty rules (should deny any IP)",
+			rules:    []Rule{},
+			testIPs:  []string{"93.184.216.34", "8.8.8.8", "2606:2800:220:1:248:1893:25c8:1946"},
+			expected: []bool{false, false, false},
+		},
+		{
+			name: "Allow all",
+			rules: []Rule{
+				{Action: "allow", Target: "all"},
+			},
+			testIPs:  []string{"93.184.216.34", "8.8.8.8", "2606:2800:220:1:248:1893:25c8:1946"},
+			expected: []bool{true, true, true},
+		},
+		{
+			name: "Deny all",
+			rules: []Rule{
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"93.184.216.34", "8.8.8.8", "2606:2800:220:1:248:1893:25c8:1946"},
+			expected: []bool{false, false, false},
+		},
+		{
+			name: "Allow specific IPv4",
+			rules: []Rule{
+				{Action: "allow", Target: "93.184.216.34"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"93.184.216.34", "93.184.216.35", "8.8.8.8"},
+			expected: []bool{true, false, false},
+		},
+		{
+			name: "Allow IPv4 range",
+			rules: []Rule{
+				{Action: "allow", Target: "93.184.216.0/24"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"93.184.216.34", "93.184.216.254", "8.8.8.8"},
+			expected: []bool{true, true, false},
+		},
+		{
+			name: "Allow specific IPv6",
+			rules: []Rule{
+				{Action: "allow", Target: "2606:2800:220:1:248:1893:25c8:1946"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"2606:2800:220:1:248:1893:25c8:1946", "2606:2800:220:1:248:1893:25c8:1947", "2001:4860:4860::8888"},
+			expected: []bool{true, false, false},
+		},
+		{
+			name: "Allow IPv6 range",
+			rules: []Rule{
+				{Action: "allow", Target: "2606:2800:220:1::/64"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"2606:2800:220:1:248:1893:25c8:1946", "2606:2800:220:1::1", "2001:4860:4860::8888"},
+			expected: []bool{true, true, false},
+		},
+		{
+			name: "Mixed IPv4 and IPv6 rules",
+			rules: []Rule{
+				{Action: "allow", Target: "93.184.216.0/24"},
+				{Action: "allow", Target: "2606:2800:220:1::/64"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946", "8.8.8.8", "2001:4860:4860::8888"},
+			expected: []bool{true, true, false, false},
+		},
+		{
+			name: "Overlapping rules (first match wins)",
+			rules: []Rule{
+				{Action: "deny", Target: "93.184.216.0/24"},
+				{Action: "allow", Target: "93.184.216.34"},
+				{Action: "allow", Target: "all"},
+			},
+			testIPs:  []string{"93.184.216.33", "93.184.216.34", "8.8.8.8"},
+			expected: []bool{false, false, true},
+		},
+		{
+			name: "Complex rule set",
+			rules: []Rule{
+				{Action: "allow", Target: "93.184.0.0/16"},
+				{Action: "deny", Target: "93.184.1.0/24"},
+				{Action: "allow", Target: "93.184.1.1/32"},
+				{Action: "allow", Target: "2606:2800:220:1::/64"},
+				{Action: "deny", Target: "2606:2800:220:1:1::/80"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"93.184.0.1", "93.184.1.0", "93.184.1.1", "192.168.1.1", "2606:2800:220:1::1", "2606:2800:220:1:1::1", "2001:4860:4860::8888"},
+			expected: []bool{true, false, true, false, true, false, false},
+		},
+		{
+			name: "Allow single IP, deny subnet containing it",
+			rules: []Rule{
+				{Action: "allow", Target: "192.168.1.100"},
+				{Action: "deny", Target: "192.168.1.0/24"},
+				{Action: "allow", Target: "all"},
+			},
+			testIPs:  []string{"192.168.1.100", "192.168.1.101", "192.168.2.1"},
+			expected: []bool{true, false, true},
+		},
+		{
+			name: "IPv6 specific cases",
+			rules: []Rule{
+				{Action: "allow", Target: "2606:2800:220:1::/64"},
+				{Action: "deny", Target: "2606:2800:220:1:1::/64"},
+				{Action: "allow", Target: "2606:2800:220:1:1:1::1"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"2606:2800:220:1::1", "2606:2800:220:1:1::1", "2606:2800:220:1:1:1::1", "2606:2800:220:2::1"},
+			expected: []bool{true, false, true, false},
+		},
+		{
+			name: "Mixed case sensitivity",
+			rules: []Rule{
+				{Action: "AlLoW", Target: "192.168.1.0/24"},
+				{Action: "dEnY", Target: "ALL"},
+			},
+			testIPs:  []string{"192.168.1.1", "10.0.0.1"},
+			expected: []bool{true, false},
+		},
+		{
+			name: "Allow all IPv4, deny all IPv6",
+			rules: []Rule{
+				{Action: "allow", Target: "0.0.0.0/0"},
+				{Action: "deny", Target: "::/0"},
+			},
+			testIPs:  []string{"192.168.1.1", "10.0.0.1", "2001:db8::1", "::1"},
+			expected: []bool{true, true, false, false},
+		},
+		{
+			name: "Allow all IPv6, deny all IPv4",
+			rules: []Rule{
+				{Action: "allow", Target: "::/0"},
+				{Action: "deny", Target: "0.0.0.0/0"},
+			},
+			testIPs:  []string{"192.168.1.1", "10.0.0.1", "2001:db8::1", "::1"},
+			expected: []bool{false, false, true, true},
+		},
+		{
+			name: "Complex IPv6 rules",
+			rules: []Rule{
+				{Action: "allow", Target: "2606:2800:220:1::/64"},
+				{Action: "deny", Target: "2606:2800:220:1:1::/80"},
+				{Action: "allow", Target: "2606:2800:220:1:1:1::/96"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"2606:2800:220:1::1", "2606:2800:220:1:1::1", "2606:2800:220:1:1:1::1", "2606:2800:220:2::1", "2001:4860:4860::8888"},
+			expected: []bool{true, false, true, true, false},
+		},
+		{
+			name: "IPv4-mapped IPv6 addresses",
+			rules: []Rule{
+				{Action: "allow", Target: "192.168.1.0/24"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"::ffff:192.168.1.1", "::ffff:192.168.2.1"},
+			expected: []bool{true, false},
+		},
+		{
+			name: "Localhost rules",
+			rules: []Rule{
+				{Action: "allow", Target: "127.0.0.1"},
+				{Action: "allow", Target: "::1"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"127.0.0.1", "::1", "127.0.0.2", "::2"},
+			expected: []bool{true, true, false, false},
+		},
+		{
+			name: "Large IPv4 range",
+			rules: []Rule{
+				{Action: "allow", Target: "93.184.0.0/16"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"93.184.0.1", "93.184.255.255", "93.185.0.1"},
+			expected: []bool{true, true, false},
+		},
+		{
+			name: "Large IPv6 range",
+			rules: []Rule{
+				{Action: "allow", Target: "2606:2800::/24"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"2606:2800:220:1:248:1893:25c8:1946", "2607:ffff:ffff:ffff:ffff:ffff:ffff:ffff", "2608::1"},
+			expected: []bool{true, true, false},
+		},
+		{
+			name: "Allow all then deny all should allow all",
+			rules: []Rule{
+				{Action: "allow", Target: "all"},
+				{Action: "deny", Target: "all"},
+			},
+			testIPs:  []string{"192.168.1.1", "10.0.0.1", "2001:db8::1"},
+			expected: []bool{true, true, true},
+		},
+		{
+			name: "Deny all then allow all should deny all",
+			rules: []Rule{
+				{Action: "deny", Target: "all"},
+				{Action: "allow", Target: "all"},
+			},
+			testIPs:  []string{"192.168.1.1", "10.0.0.1", "2001:db8::1"},
+			expected: []bool{false, false, false},
+		},
+	}
+
 	for _, tc := range testCases {
-		allowed, err := filter.IsAllowedIP(tc.ip)
-		if err != nil {
-			t.Errorf("IsAllowedIP failed for %s: %v", tc.ip, err)
-		}
-		if allowed != tc.expected {
-			t.Errorf("IsAllowedIP(%s) = %v, expected %v", tc.ip, allowed, tc.expected)
-		}
-	}
+		t.Run(tc.name, func(t *testing.T) {
+			// Clear existing rules
+			err := filter.RemoveAllRules()
+			assert.NoError(t, err)
 
-	// Clean up
-	filter.client.Del(ctx, "ip_rules")
-}
+			// Add new rules
+			for _, rule := range tc.rules {
+				_, err := filter.AppendRule(rule)
+				assert.NoError(t, err)
+			}
 
-func TestNewIPFilter(t *testing.T) {
-	filter := NewIPFilter("localhost:6379")
-	if filter == nil {
-		t.Error("NewIPFilter returned nil")
+			// Test each IP
+			for i, ip := range tc.testIPs {
+				allowed, err := filter.IsAllowedIP(ip)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expected[i], allowed, "Unexpected result for IP %s", ip)
+			}
+		})
 	}
-	if filter.client == nil {
-		t.Error("NewIPFilter did not initialize Redis client")
-	}
-}
-
-func TestLoadRules(t *testing.T) {
-	filter := NewIPFilter("localhost:6379")
-	
-	// Add test rules
-	testRules := []Rule{
-		{Action: "allow", Target: "192.168.1.1"},
-		{Action: "deny", Target: "10.0.0.0/8"},
-		{Action: "allow", Target: "2001:db8::/32"},
-	}
-	
-	for _, rule := range testRules {
-		err := filter.AddRule(rule)
-		if err != nil {
-			t.Errorf("Failed to add rule: %v", err)
-		}
-	}
-	
-	rules, err := filter.LoadRules()
-	if err != nil {
-		t.Errorf("LoadRules failed: %v", err)
-	}
-	
-	if len(rules) != len(testRules) {
-		t.Errorf("Expected %d rules, got %d", len(testRules), len(rules))
-	}
-	
-	// Add a check for rule order
-	for i, rule := range rules {
-		if rule != testRules[i] {
-			t.Errorf("Rule at index %d does not match: got %v, expected %v", i, rule, testRules[i])
-		}
-	}
-	
-	// Clean up
-	ctx := filter.client.Context()
-	filter.client.Del(ctx, "ip_rules")
-}
-
-func TestAddRule(t *testing.T) {
-	filter := NewIPFilter("localhost:6379")
-	
-	rule := Rule{Action: "allow", Target: "2001:db8::1"}
-	err := filter.AddRule(rule)
-	if err != nil {
-		t.Errorf("AddRule failed: %v", err)
-	}
-	
-	rules, err := filter.LoadRules()
-	if err != nil {
-		t.Errorf("LoadRules failed: %v", err)
-	}
-	
-	if len(rules) != 1 {
-		t.Errorf("Expected 1 rule, got %d", len(rules))
-	}
-	
-	if rules[0] != rule {
-		t.Errorf("Added rule does not match: got %v, expected %v", rules[0], rule)
-	}
-	
-	// Clean up
-	ctx := filter.client.Context()
-	filter.client.Del(ctx, "ip_rules")
-}
-
-func TestRemoveRule(t *testing.T) {
-	filter := NewIPFilter("localhost:6379")
-	
-	// Add test rules
-	testRules := []Rule{
-		{Action: "allow", Target: "192.168.1.1"},
-		{Action: "deny", Target: "10.0.0.0/8"},
-		{Action: "allow", Target: "2001:db8::/32"},
-	}
-	
-	for _, rule := range testRules {
-		err := filter.AddRule(rule)
-		if err != nil {
-			t.Errorf("Failed to add rule: %v", err)
-		}
-	}
-	
-	// Remove a rule
-	ruleToRemove := testRules[1]
-	err := filter.RemoveRule(ruleToRemove)
-	if err != nil {
-		t.Errorf("RemoveRule failed: %v", err)
-	}
-	
-	// Check if the rule was removed
-	rules, err := filter.LoadRules()
-	if err != nil {
-		t.Errorf("LoadRules failed: %v", err)
-	}
-	
-	if len(rules) != len(testRules)-1 {
-		t.Errorf("Expected %d rules, got %d", len(testRules)-1, len(rules))
-	}
-	
-	for _, rule := range rules {
-		if rule == ruleToRemove {
-			t.Errorf("Removed rule still present: %v", rule)
-		}
-	}
-	
-	// Clean up
-	ctx := filter.client.Context()
-	filter.client.Del(ctx, "ip_rules")
 }

@@ -110,6 +110,11 @@ func (f *IPFilter) IsAllowedIP(ip string) (bool, error) {
 		return false, fmt.Errorf("invalid IP address: %s", ip)
 	}
 
+	// Add a check for private or special IP addresses
+	if isPrivateOrSpecialIP(ipAddr) {
+		return false, fmt.Errorf("private or special IP addresses are not allowed: %s", ip)
+	}
+
 	for _, rule := range rules {
 		if rule.Target == "all" || rule.Target == ip {
 			return rule.Action == "allow", nil
@@ -209,19 +214,19 @@ func (f *IPFilter) AddRuleAtPosition(rule Rule, position int) error {
 		return fmt.Errorf("invalid position: %d", position)
 	}
 
-	// If position is at the end, use RPush
-	if int64(position) == length {
-		err = f.client.RPush(ctx, "ip_rules", ruleString).Err()
-	} else {
-		// Get the rule at the specified position
-		pivot, err := f.client.LIndex(ctx, "ip_rules", int64(position)).Result()
-		if err != nil {
-			return fmt.Errorf("failed to get pivot rule: %w", err)
+	// Use a transaction to ensure atomicity
+	_, err = f.client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		if int64(position) == length {
+			pipe.RPush(ctx, "ip_rules", ruleString)
+		} else {
+			pivot, err := f.client.LIndex(ctx, "ip_rules", int64(position)).Result()
+			if err != nil {
+				return fmt.Errorf("failed to get pivot rule: %w", err)
+			}
+			pipe.LInsert(ctx, "ip_rules", "BEFORE", pivot, ruleString)
 		}
-
-		// Insert the new rule before the pivot
-		err = f.client.LInsert(ctx, "ip_rules", "BEFORE", pivot, ruleString).Err()
-	}
+		return nil
+	})
 
 	if err != nil {
 		return fmt.Errorf("failed to add rule at position %d: %w", position, err)

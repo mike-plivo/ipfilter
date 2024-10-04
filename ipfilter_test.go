@@ -394,4 +394,40 @@ func TestExtendedIPFilter(t *testing.T) {
 			}
 		})
 	}
+
+	// Updated test case for private and special IP blocks
+	t.Run("Private and special IP blocks", func(t *testing.T) {
+		// Clear existing rules
+		err := filter.RemoveAllRules()
+		assert.NoError(t, err)
+
+		// Add a rule to allow all
+		_, err = filter.AppendRule(Rule{Action: "allow", Target: "all"})
+		assert.NoError(t, err)
+
+		testCases := []struct {
+			name string
+			ip   string
+		}{
+			{"Private IPv4 10.0.0.0/8", "10.0.0.1"},
+			{"Private IPv4 172.16.0.0/12", "172.16.0.1"},
+			{"Private IPv4 192.168.0.0/16", "192.168.0.1"},
+			{"Loopback IPv4", "127.0.0.1"},
+			{"Link-local IPv4", "169.254.0.1"},
+			{"Private IPv6 fc00::/7", "fc00::1"},
+			{"Loopback IPv6", "::1"},
+			{"Link-local IPv6", "fe80::1"},
+			{"Unique Local IPv6", "fd00::1"},
+			{"Multicast IPv4", "224.0.0.1"},
+			{"Multicast IPv6", "ff00::1"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				allowed, err := filter.IsAllowedIP(tc.ip)
+				assert.NoError(t, err)
+				assert.False(t, allowed, "Expected IP %s to be denied even with 'allow all' rule", tc.ip)
+			})
+		}
+	})
 }

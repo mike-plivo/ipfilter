@@ -5,15 +5,15 @@ import (
 	"log"
 	"os"
 
-	ipfilter "github.com/mike-plivo/ipfilter"
+	"github.com/mike-plivo/ipfilter"
 )
 
 func main() {
-	redisURL := os.Getenv("REDIS_URL")
-	if redisURL == "" {
-		log.Fatal("REDIS_URL environment variable is not set")
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		log.Fatal("REDIS_ADDR environment variable is not set")
 	}
-	filter := ipfilter.NewIPFilter(redisURL)
+	filter := ipfilter.NewIPFilter(redisAddr)
 
 	// Example: Add rules
 	rules := []ipfilter.Rule{
@@ -28,8 +28,11 @@ func main() {
 
 	// Add rules and handle errors
 	for _, rule := range rules {
-		if err := filter.AddRule(rule); err != nil {
+		addedRule, err := filter.AppendRule(rule)
+		if err != nil {
 			log.Printf("Error adding rule %v: %v\n", rule, err)
+		} else {
+			log.Printf("Added rule: %+v\n", addedRule)
 		}
 	}
 

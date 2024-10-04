@@ -9,7 +9,7 @@ import (
 func getRedisURL() string {
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		assert.FailNow("REDIS_URL is not set")
+		assert.FailNowf(t, "REDIS_URL is not set", "REDIS_URL is not set")
 	}
 	return redisURL
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"github.com/stretchr/testify/assert"
 )
 
 type testingT interface {
@@ -38,66 +37,105 @@ func TestIPFilter(t *testing.T) {
 	rule2 := Rule{Action: "deny", Target: "8.8.8.8"}
 	
 	_, err := filter.AppendRule(rule1)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("Failed to append rule1: %v", err)
+	}
 	
 	_, err = filter.AppendRule(rule2)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("Failed to append rule2: %v", err)
+	}
 
 	// Test getting all rules
 	rules, err := filter.GetAllRules()
-	assert.NoError(t, err)
-	assert.Len(t, rules, 2)
-	assert.Equal(t, rule1.Action, rules[0].Action)
-	assert.Equal(t, rule1.Target, rules[0].Target)
-	assert.Equal(t, rule2.Action, rules[1].Action)
-	assert.Equal(t, rule2.Target, rules[1].Target)
+	if err != nil {
+		t.Errorf("Failed to get all rules: %v", err)
+	}
+	if len(rules) != 2 {
+		t.Errorf("Expected 2 rules, got %d", len(rules))
+	}
+	if rules[0].Action != rule1.Action || rules[0].Target != rule1.Target {
+		t.Errorf("Rule1 mismatch: got %v, want %v", rules[0], rule1)
+	}
+	if rules[1].Action != rule2.Action || rules[1].Target != rule2.Target {
+		t.Errorf("Rule2 mismatch: got %v, want %v", rules[1], rule2)
+	}
 
 	// Test IsAllowedIP
 	allowed, err := filter.IsAllowedIP("93.184.216.34")
-	assert.NoError(t, err)
-	assert.True(t, allowed)
+	if err != nil {
+		t.Errorf("IsAllowedIP failed: %v", err)
+	}
+	if !allowed {
+		t.Error("Expected 93.184.216.34 to be allowed")
+	}
 
 	allowed, err = filter.IsAllowedIP("8.8.8.8")
-	assert.NoError(t, err)
-	assert.False(t, allowed)
+	if err != nil {
+		t.Errorf("IsAllowedIP failed: %v", err)
+	}
+	if allowed {
+		t.Error("Expected 8.8.8.8 to be denied")
+	}
 
 	// Test adding a rule at a specific position
 	rule3 := Rule{Action: "allow", Target: "2606:2800:220:1:248:1893:25c8:1946/64"}
 	err = filter.AddRuleAtPosition(rule3, 1)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("Failed to add rule3 at position 1: %v", err)
+	}
 
 	// Verify the new rule was added at the correct position
 	ruleAtPos, err := filter.GetRuleAtPosition(1)
-	assert.NoError(t, err)
-	assert.Equal(t, rule3.Action, ruleAtPos.Action)
-	assert.Equal(t, rule3.Target, ruleAtPos.Target)
+	if err != nil {
+		t.Errorf("Failed to get rule at position 1: %v", err)
+	}
+	if rule3.Action != ruleAtPos.Action || rule3.Target != ruleAtPos.Target {
+		t.Errorf("Rule3 mismatch at position 1: got %v, want %v", ruleAtPos, rule3)
+	}
 
 	// Test removing a rule at a specific position
 	err = filter.RemoveRuleAtPosition(0)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("Failed to remove rule at position 0: %v", err)
+	}
 
 	// Verify the rule was removed
 	ruleCount, err := filter.GetRuleCount()
-	assert.NoError(t, err)
-	assert.Equal(t, int64(2), ruleCount)
+	if err != nil {
+		t.Errorf("Failed to get rule count: %v", err)
+	}
+	if ruleCount != int64(2) {
+		t.Errorf("Expected 2 rules, got %d", ruleCount)
+	}
 
 	// Test removing all rules
 	err = filter.RemoveAllRules()
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("Failed to remove all rules: %v", err)
+	}
 
 	// Verify all rules were removed
 	ruleCount, err = filter.GetRuleCount()
-	assert.NoError(t, err)
-	assert.Equal(t, int64(0), ruleCount)
+	if err != nil {
+		t.Errorf("Failed to get rule count: %v", err)
+	}
+	if ruleCount != int64(0) {
+		t.Errorf("Expected 0 rules, got %d", ruleCount)
+	}
 
 	// Test custom ruleKey
 	customRuleKey := "custom_ip_rules"
 	customFilter := NewIPFilter(getRedisURL(), customRuleKey)
-	assert.Equal(t, customRuleKey, customFilter.GetRuleKey(), "Custom rule key not set correctly")
+	if customFilter.GetRuleKey() != customRuleKey {
+		t.Error("Custom rule key not set correctly")
+	}
 
 	// Test default ruleKey
 	defaultFilter := NewIPFilter(getRedisURL())
-	assert.Equal(t, "ip_rules", defaultFilter.GetRuleKey(), "Default rule key not set correctly")
+	if defaultFilter.GetRuleKey() != "ip_rules" {
+		t.Error("Default rule key not set correctly")
+	}
 }
 
 func TestValidateRule(t *testing.T) {
@@ -109,7 +147,9 @@ func TestValidateRule(t *testing.T) {
 
 	for _, rule := range validRules {
 		err := ValidateRule(rule)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Errorf("Expected rule to be valid: %v", rule)
+		}
 	}
 
 	invalidRules := []Rule{
@@ -120,7 +160,9 @@ func TestValidateRule(t *testing.T) {
 
 	for _, rule := range invalidRules {
 		err := ValidateRule(rule)
-		assert.Error(t, err)
+		if err == nil {
+			t.Errorf("Expected rule to be invalid: %v", rule)
+		}
 	}
 }
 
@@ -142,24 +184,32 @@ func TestGetRuleAtPosition(t *testing.T) {
 
 	for _, rule := range rules {
 		_, err := filter.AppendRule(rule)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Errorf("Failed to append rule: %v", rule)
+		}
 	}
 
 	// Test getting rules at valid positions
 	for i, expectedRule := range rules {
 		rule, err := filter.GetRuleAtPosition(i)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedRule.Action, rule.Action)
-		assert.Equal(t, expectedRule.Target, rule.Target)
-		assert.Equal(t, i, rule.Position)
+		if err != nil {
+			t.Errorf("Failed to get rule at position %d: %v", i, err)
+		}
+		if rule.Action != expectedRule.Action || rule.Target != expectedRule.Target || rule.Position != i {
+			t.Errorf("Rule mismatch at position %d: got %v, want %v", i, rule, expectedRule)
+		}
 	}
 
 	// Test getting rule at invalid position
 	_, err = filter.GetRuleAtPosition(-1)
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("Expected error for getting rule at position -1")
+	}
 
 	_, err = filter.GetRuleAtPosition(len(rules))
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("Expected error for getting rule at position len(rules)")
+	}
 }
 
 func TestUpdatePositions(t *testing.T) {
@@ -179,19 +229,28 @@ func TestUpdatePositions(t *testing.T) {
 
 	for _, rule := range rules {
 		_, err := filter.AppendRule(rule)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Errorf("Failed to append rule: %v", rule)
+		}
 	}
 
 	// Remove a rule from the middle
 	err = filter.RemoveRuleAtPosition(1)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("Failed to remove rule at position 1: %v", err)
+	}
 
 	// Verify positions are updated
 	updatedRules, err := filter.GetAllRules()
-	assert.NoError(t, err)
-	assert.Len(t, updatedRules, 2)
-	assert.Equal(t, 0, updatedRules[0].Position)
-	assert.Equal(t, 1, updatedRules[1].Position)
+	if err != nil {
+		t.Errorf("Failed to get all rules: %v", err)
+	}
+	if len(updatedRules) != 2 {
+		t.Errorf("Expected 2 rules, got %d", len(updatedRules))
+	}
+	if updatedRules[0].Position != 0 || updatedRules[1].Position != 1 {
+		t.Errorf("Unexpected positions: got %v, want [0, 1]", updatedRules)
+	}
 }
 
 func TestExtendedIPFilter(t *testing.T) {
@@ -400,14 +459,20 @@ func TestExtendedIPFilter(t *testing.T) {
 			// Add new rules
 			for _, rule := range tc.rules {
 				_, err := filter.AppendRule(rule)
-				assert.NoError(t, err)
+				if err != nil {
+					t.Fatalf("Failed to append rule: %v", err)
+				}
 			}
 
 			// Test each IP
 			for i, ip := range tc.testIPs {
 				allowed, err := filter.IsAllowedIP(ip)
-				assert.NoError(t, err)
-				assert.Equal(t, tc.expected[i], allowed, "Unexpected result for IP %s", ip)
+				if err != nil {
+					t.Errorf("IsAllowedIP failed for %s: %v", ip, err)
+				}
+				if allowed != tc.expected[i] {
+					t.Errorf("Unexpected result for IP %s: got %v, want %v", ip, allowed, tc.expected[i])
+				}
 			}
 		})
 	}
@@ -419,7 +484,9 @@ func TestExtendedIPFilter(t *testing.T) {
 
 		// Add a rule to allow all
 		_, err := filter.AppendRule(Rule{Action: "allow", Target: "all"})
-		assert.NoError(t, err)
+		if err != nil {
+			t.Fatalf("Failed to append rule: %v", err)
+		}
 
 		testCases := []struct {
 			name string
@@ -441,8 +508,12 @@ func TestExtendedIPFilter(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				allowed, err := filter.IsAllowedIP(tc.ip)
-				assert.NoError(t, err)
-				assert.False(t, allowed, "Expected IP %s to be denied even with 'allow all' rule", tc.ip)
+				if err != nil {
+					t.Errorf("IsAllowedIP failed for %s: %v", tc.ip, err)
+				}
+				if allowed {
+					t.Errorf("Expected IP %s to be denied even with 'allow all' rule", tc.ip)
+				}
 			})
 		}
 	})

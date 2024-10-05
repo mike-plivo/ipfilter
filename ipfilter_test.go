@@ -190,10 +190,10 @@ func TestExtendedIPFilter(t *testing.T) {
 		expected []bool
 	}{
 		{
-			name:     "Empty rules (should deny any IP)",
+			name:     "Empty rules (should allow any IP)",
 			rules:    []Rule{},
 			testIPs:  []string{"93.184.216.34", "8.8.8.8", "2606:2800:220:1:248:1893:25c8:1946"},
-			expected: []bool{false, false, false},
+			expected: []bool{true, true, true},
 		},
 		{
 			name: "Allow all",

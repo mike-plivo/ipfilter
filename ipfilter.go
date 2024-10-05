@@ -96,11 +96,13 @@ func (f *IPFilter) LoadRules() ([]Rule, error) {
 // IsAllowedIP tests one IP against the rules and returns if it's allowed or denied
 func (f *IPFilter) IsAllowedIP(ip string) (bool, error) {
 	rules, err := f.LoadRules()
+
+	// if there is an error, allow the traffic
 	if err != nil {
-		return false, err
+		return true, err
 	}
 
-	// If there are no rules, allow all traffic
+	// If there are no rules, allow the traffic
 	if len(rules) == 0 {
 		return true, nil
 	}
@@ -131,7 +133,7 @@ func (f *IPFilter) IsAllowedIP(ip string) (bool, error) {
 		}
 	}
 
-	// If no rules match, deny the traffic
+	// If none of the rules matches, deny the traffic
 	return false, nil
 }
 

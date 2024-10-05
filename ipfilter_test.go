@@ -354,8 +354,8 @@ func TestExtendedIPFilter(t *testing.T) {
 				{Action: "allow", Target: "2606:2800::/24"},
 				{Action: "deny", Target: "all"},
 			},
-			testIPs:  []string{"2606:2800:220:1:248:1893:25c8:1946", "2607:ffff:ffff:ffff:ffff:ffff:ffff:ffff", "2608::1"},
-			expected: []bool{true, true, false},
+			testIPs:  []string{"2606:2800:220:1:248:1893:25c8:1946", "2606:ffff:ffff:ffff:ffff:ffff:ffff:ffff", "2608::1"},
+			expected: []bool{true, false, false},
 		},
 		{
 			name: "Allow all then deny all, should allow all",
@@ -363,7 +363,7 @@ func TestExtendedIPFilter(t *testing.T) {
 				{Action: "allow", Target: "all"},
 				{Action: "deny", Target: "all"},
 			},
-			testIPs:  []string{"203.0.113.1", "198.51.100.1", "2001:db8::1"},
+			testIPs:  []string{"83.0.113.1", "98.51.100.1", "2006:db8::1"},
 			expected: []bool{true, true, true},
 		},
 		{
@@ -372,7 +372,7 @@ func TestExtendedIPFilter(t *testing.T) {
 				{Action: "deny", Target: "all"},
 				{Action: "allow", Target: "all"},
 			},
-			testIPs:  []string{"203.0.113.1", "198.51.100.1", "2001:db8::1"},
+			testIPs:  []string{"83.0.113.1", "98.51.100.1", "2006:db8::1"},
 			expected: []bool{false, false, false},
 		},
 	}

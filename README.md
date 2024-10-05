@@ -156,7 +156,7 @@ To use this package in your Go project:
 
 6. Run tests:
    ```
-   go test ./...
+   go test .
    ```
 
 ## Running Tests with Docker
@@ -191,12 +191,29 @@ The `Dockerfile` should be configured to:
 
 After the tests complete, the container will stop and remove itself automatically. You can view the test results in the console output.
 
-## Testing
+## Other commands with Docker
+
+### Run benchmarks
+```
+docker run --rm ipfilter-test bench
+```
+
+### Run examples
+```
+docker run --rm ipfilter-test examples
+```
+
+### Run shell
+```
+docker run --rm -ti ipfilter-test shell
+```
+
+## Testing locally without Docker
 
 To run tests for this package locally, you can use the standard Go testing tools. Make sure you have a Redis instance running locally.
 
 ```
-go test ./...
+go test .
 ```
 
 Alternatively, you can use the Docker setup described above to run tests in an isolated environment.

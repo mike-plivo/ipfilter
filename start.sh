@@ -3,12 +3,12 @@ redis-server --daemonize yes
 sleep 1
 case "$1" in
   "test")
-    echo "Running tests..."
-    /usr/local/go/bin/go test ./...
+    echo "Running tests in the current directory..."
+    /usr/local/go/bin/go test .
     ;;
   "benchmark"|"bench")
     echo "Running benchmarks..."
-    /usr/local/go/bin/go test -bench=. ./...
+    /usr/local/go/bin/go test -bench=. .
     ;;
   "shell"|"sh"|"bash")
     echo "Starting shell..."

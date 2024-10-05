@@ -1,6 +1,9 @@
 # Use the official Go image as the base image
 FROM golang:1.20
 
+# Install Redis
+RUN apt-get update && apt-get install -y redis-server
+
 # Set the working directory inside the container
 WORKDIR /app
 
@@ -16,11 +19,9 @@ RUN go mod tidy || true
 # Copy the entire project
 COPY . .
 
-# Run all test cases
+# Make the start.sh script executable
+RUN chmod +x /app/start.sh
 
-# Build the application
-#RUN go build -o example1 examples/example1.go
-
-# Command to run the executable
-#CMD ["./example1"]
-CMD ["/usr/local/go/bin/go", "test", "./..."]
+# Command to run Redis and the specified task
+ENTRYPOINT ["/app/start.sh"]
+CMD ["test"]

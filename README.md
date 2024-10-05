@@ -7,7 +7,7 @@ This package provides an IP filtering system using Redis as a backend for storin
 - Allow or deny specific IP addresses or CIDR ranges
 - Automatic filtering of private and special IP ranges
 - Redis-backed rule storage for persistence and scalability
-- Docker Compose setup for easy testing and deployment
+- Docker setup for easy testing and deployment
 
 ## How It Works
 
@@ -83,46 +83,140 @@ To use this package in your Go project:
    }
    ```
 
-## Running Tests with Docker Compose
+## Installation and Running (Without Docker)
 
-This project includes a Docker Compose setup to easily run all test cases in an isolated environment. Here's how to use it:
+### Prerequisites
+- Go 1.19 or later
+- Redis
 
-1. Ensure you have Docker and Docker Compose installed on your system.
+### MacOS
 
-2. Navigate to the directory containing the `docker-compose.yml` file.
-
-3. Run the tests using Docker Compose:
+1. Install Go 1.19 or later:
    ```
-   docker-compose up --build
+   brew install go@1.19
+   ```
+   Note: If you need a more recent version, you can use `brew install go` instead.
+
+2. Install Redis:
+   ```
+   brew install redis
    ```
 
-This command will:
+3. Start Redis:
+   ```
+   brew services start redis
+   ```
+
+4. Clone the repository:
+   ```
+   git clone https://github.com/mike-plivo/ipfilter.git
+   cd ipfilter
+   ```
+
+5. Install dependencies:
+   ```
+   go mod download
+   ```
+
+6. Run tests:
+   ```
+   go test ./...
+   ```
+
+### Linux (Debian/Ubuntu)
+
+1. Install Go 1.19 or later:
+   ```
+   sudo add-apt-repository ppa:longsleep/golang-backports
+   sudo apt update
+   sudo apt install golang-go
+   ```
+   Note: This method installs the latest stable version of Go. Verify the version with `go version` after installation.
+
+2. Install Redis:
+   ```
+   sudo apt install redis-server
+   ```
+
+3. Start Redis:
+   ```
+   sudo systemctl start redis-server
+   ```
+
+4. Clone the repository:
+   ```
+   git clone https://github.com/mike-plivo/ipfilter.git
+   cd ipfilter
+   ```
+
+5. Install dependencies:
+   ```
+   go mod download
+   ```
+
+6. Run tests:
+   ```
+   go test .
+   ```
+
+## Running Tests with Docker
+
+This project includes a Docker setup to easily run all test cases in an isolated environment. Here's how to use it:
+
+1. Ensure you have Docker installed on your system.
+
+2. Navigate to the directory containing the `Dockerfile`.
+
+3. Build the Docker image:
+   ```
+   docker build -t ipfilter-test .
+   ```
+
+4. Run the tests using Docker:
+   ```
+   docker run --rm ipfilter-test
+   ```
+
+This setup will:
 - Build a Docker image for the application, including all dependencies.
-- Start a Redis container for the tests to use.
-- Run all the test cases in the application container.
+- Run all the test cases in the container.
 - Display the test results in the console.
 
-The `docker-compose.yml` file is configured to:
-- Use a Redis container as a dependency for the tests.
-- Ensure Redis is healthy before starting the test run.
+The `Dockerfile` should be configured to:
+- Install necessary dependencies.
+- Copy the application code into the container.
+- Set up and run Redis within the container.
 - Set the necessary environment variables for the tests.
+- Run the tests as the default command.
 
-After the tests complete, the containers will stop automatically. You can view the test results in the console output.
+After the tests complete, the container will stop and remove itself automatically. You can view the test results in the console output.
 
-To clean up after running the tests, you can use:
+## Other commands with Docker
+
+### Run benchmarks
 ```
-docker-compose down
+docker run --rm ipfilter-test bench
 ```
 
-This setup allows you to run the entire test suite in a consistent environment, regardless of your local setup.
+### Run examples
+```
+docker run --rm ipfilter-test examples
+```
 
-## Testing
+### Run shell
+```
+docker run --rm -ti ipfilter-test shell
+```
 
-To run tests for this package, you can use the standard Go testing tools. Make sure you have a Redis instance running (you can use the Docker Compose setup for this).
+## Testing locally without Docker
+
+To run tests for this package locally, you can use the standard Go testing tools. Make sure you have a Redis instance running locally.
 
 ```
-go test ./...
+go test .
 ```
+
+Alternatively, you can use the Docker setup described above to run tests in an isolated environment.
 
 ## Contributing
 

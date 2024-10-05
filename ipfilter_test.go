@@ -1,23 +1,29 @@
 package ipfilter
 
 import (
+	"fmt"
 	"os"
 	"testing"
-	"log"
 	"github.com/stretchr/testify/assert"
 )
+
+type testingT interface {
+	Error(args ...interface{})
+}
 
 func getRedisURL() string {
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		log.Fatalf("REDIS_URL is not set")
+		redisURL = "localhost:6379"
 	}
 	return redisURL
 }
 
-func cleanupRules(t *testing.T, filter *IPFilter) {
+func cleanupRules(t testingT, filter *IPFilter) {
 	err := filter.RemoveAllRules()
-	assert.NoError(t, err, "Failed to remove all rules during cleanup")
+	if err != nil {
+		t.Error("Failed to remove all rules during cleanup:", err)
+	}
 }
 
 func TestIPFilter(t *testing.T) {
@@ -328,7 +334,7 @@ func TestExtendedIPFilter(t *testing.T) {
 				{Action: "allow", Target: "2606:2800:220:1:1::/96"},
 				{Action: "deny", Target: "all"},
 			},
-			testIPs:  []string{"2606:2800:220:0:1:2:3:4", "2606:2800:220:1:5:6:7:8", "2606:2800:220:0:1:9:10:11", "2606:2800:221:0:12:13:14:15", "2505:4860:4860::8888"},
+			testIPs:  []string{"2606:2800:220:0:1:2:3:4", "2606:2800:220:1:5:6:7:8", "2606:2800:220:0:1:9:10:11", "2606:2800:220:2::1", "2505:4860:4860::8888"},
 			expected: []bool{true, false, true, false, false},
 		},
 		{
@@ -432,3 +438,73 @@ func TestExtendedIPFilter(t *testing.T) {
 		}
 	})
 }
+
+func generatePublicRulesIPv4(count int) []Rule {
+	rules := make([]Rule, count)
+	for i := 0; i < count; i++ {
+		action := "allow"
+		if i%2 == 0 {
+			action = "deny"
+		}
+		rules[i] = Rule{Action: action, Target: fmt.Sprintf("93.%d.%d.0/24", i/256, i%256)}
+	}
+	return rules
+}
+
+func generatePublicRulesIPv6(count int) []Rule {
+	rules := make([]Rule, count)
+	for i := 0; i < count; i++ {
+		action := "allow"
+		if i%2 == 0 {
+			action = "deny"
+		}
+		// Using 2606:2800::/32, which is assigned to Akamai Technologies
+		rules[i] = Rule{Action: action, Target: fmt.Sprintf("2606:2800:%x::/48", i)}
+	}
+	return rules
+}
+
+func benchmarkIsAllowedIPWithRules(b *testing.B, ruleCount int, ipVersion string) {
+	filter := NewIPFilter(getRedisURL())
+	defer cleanupRules(b, filter)
+
+	var rules []Rule
+	var ip string
+
+	if ipVersion == "ipv4" {
+		rules = generatePublicRulesIPv4(ruleCount)
+		ip = "93.0.0.1" // This IP will match the first rule
+	} else {
+		rules = generatePublicRulesIPv6(ruleCount)
+		ip = "2606:2800:0::1" // This IP will match the first rule
+	}
+
+	for _, rule := range rules {
+		_, err := filter.AppendRule(rule)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := filter.IsAllowedIP(ip)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkIsAllowedIPv410Rules(b *testing.B)    { benchmarkIsAllowedIPWithRules(b, 10, "ipv4") }
+func BenchmarkIsAllowedIPv425Rules(b *testing.B)    { benchmarkIsAllowedIPWithRules(b, 25, "ipv4") }
+func BenchmarkIsAllowedIPv450Rules(b *testing.B)    { benchmarkIsAllowedIPWithRules(b, 50, "ipv4") }
+func BenchmarkIsAllowedIPv4100Rules(b *testing.B)   { benchmarkIsAllowedIPWithRules(b, 100, "ipv4") }
+func BenchmarkIsAllowedIPv4500Rules(b *testing.B)   { benchmarkIsAllowedIPWithRules(b, 500, "ipv4") }
+func BenchmarkIsAllowedIPv41000Rules(b *testing.B)  { benchmarkIsAllowedIPWithRules(b, 1000, "ipv4") }
+
+func BenchmarkIsAllowedIPv610Rules(b *testing.B)    { benchmarkIsAllowedIPWithRules(b, 10, "ipv6") }
+func BenchmarkIsAllowedIPv625Rules(b *testing.B)    { benchmarkIsAllowedIPWithRules(b, 25, "ipv6") }
+func BenchmarkIsAllowedIPv650Rules(b *testing.B)    { benchmarkIsAllowedIPWithRules(b, 50, "ipv6") }
+func BenchmarkIsAllowedIPv6100Rules(b *testing.B)   { benchmarkIsAllowedIPWithRules(b, 100, "ipv6") }
+func BenchmarkIsAllowedIPv6500Rules(b *testing.B)   { benchmarkIsAllowedIPWithRules(b, 500, "ipv6") }
+func BenchmarkIsAllowedIPv61000Rules(b *testing.B)  { benchmarkIsAllowedIPWithRules(b, 1000, "ipv6") }

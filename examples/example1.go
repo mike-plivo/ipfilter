@@ -8,11 +8,16 @@ import (
 	"github.com/mike-plivo/ipfilter"
 )
 
-func main() {
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		log.Fatal("REDIS_ADDR environment variable is not set")
+func getRedisURL() string {
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "localhost:6379"
 	}
+	return redisURL
+}
+
+func main() {
+	redisAddr := getRedisURL()
 	filter := ipfilter.NewIPFilter(redisAddr)
 
 	// Example: Add rules

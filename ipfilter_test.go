@@ -15,8 +15,17 @@ func getRedisURL() string {
 	return redisURL
 }
 
+func cleanupRules(t *testing.T, filter *IPFilter) {
+	err := filter.RemoveAllRules()
+	assert.NoError(t, err, "Failed to remove all rules during cleanup")
+}
+
 func TestIPFilter(t *testing.T) {
 	filter := NewIPFilter(getRedisURL())
+	defer cleanupRules(t, filter)
+
+	// Ensure rules are cleared at the start
+	cleanupRules(t, filter)
 
 	// Test adding rules
 	rule1 := Rule{Action: "allow", Target: "93.184.216.0/24"}
@@ -102,6 +111,11 @@ func TestValidateRule(t *testing.T) {
 
 func TestGetRuleAtPosition(t *testing.T) {
 	filter := NewIPFilter(getRedisURL())
+	defer cleanupRules(t, filter)
+
+	// Ensure rules are cleared at the start
+	cleanupRules(t, filter)
+
 	var err error
 
 	// Add some rules
@@ -135,6 +149,11 @@ func TestGetRuleAtPosition(t *testing.T) {
 
 func TestUpdatePositions(t *testing.T) {
 	filter := NewIPFilter(getRedisURL())
+	defer cleanupRules(t, filter)
+
+	// Ensure rules are cleared at the start
+	cleanupRules(t, filter)
+
 	var err error
 	// Add some rules
 	rules := []Rule{
@@ -162,6 +181,7 @@ func TestUpdatePositions(t *testing.T) {
 
 func TestExtendedIPFilter(t *testing.T) {
 	filter := NewIPFilter(getRedisURL())
+	defer cleanupRules(t, filter)
 
 	testCases := []struct {
 		name     string
@@ -378,9 +398,8 @@ func TestExtendedIPFilter(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Clear existing rules
-			err := filter.RemoveAllRules()
-			assert.NoError(t, err)
+			// Ensure rules are cleared at the start of each subtest
+			cleanupRules(t, filter)
 
 			// Add new rules
 			for _, rule := range tc.rules {
@@ -399,12 +418,11 @@ func TestExtendedIPFilter(t *testing.T) {
 
 	// Updated test case for private and special IP blocks
 	t.Run("Private and special IP blocks", func(t *testing.T) {
-		// Clear existing rules
-		err := filter.RemoveAllRules()
-		assert.NoError(t, err)
+		// Ensure rules are cleared at the start
+		cleanupRules(t, filter)
 
 		// Add a rule to allow all
-		_, err = filter.AppendRule(Rule{Action: "allow", Target: "all"})
+		_, err := filter.AppendRule(Rule{Action: "allow", Target: "all"})
 		assert.NoError(t, err)
 
 		testCases := []struct {

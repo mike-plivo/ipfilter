@@ -2,7 +2,7 @@
 FROM golang:1.13-alpine
 
 # Install Redis
-RUN apk update && apk add redis
+RUN apk update && apk add redis && apk add gcc
 
 # Set the working directory inside the container
 WORKDIR /app

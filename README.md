@@ -32,8 +32,8 @@ When an IP address is checked against the filter:
 
 The package includes a function `IsPrivateOrSpecialIP` that automatically checks if an IP address falls within private or special ranges. This includes:
 
-- IPv4 private ranges (e.g., 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
-- IPv6 private ranges (e.g., fc00::/7, fe80::/10)
+- IPv4 private ranges
+- IPv6 private ranges
 - Special purpose IP ranges (e.g., loopback, multicast, reserved)
 
 This function is used in the `IsAllowedIP` method to automatically deny access to these IP ranges, enhancing security by default.
@@ -70,13 +70,13 @@ To use this package in your Go project:
 
 3. Add rules:
    ```go
-   rule := ipfilter.Rule{Action: "allow", Target: "192.168.1.0/24"}
+   rule := ipfilter.Rule{Action: "allow", Target: "203.0.113.0/24"}
    filter.AppendRule(rule)
    ```
 
 4. Check if an IP is allowed:
    ```go
-   allowed, err := filter.IsAllowedIP("192.168.1.100")
+   allowed, err := filter.IsAllowedIP("203.0.113.100")
    if err != nil {
        // Handle error
    }
@@ -85,6 +85,11 @@ To use this package in your Go project:
    } else {
        // Deny the connection
    }
+   ```
+
+5. Set a custom Redis key
+   ```go
+   filter := ipfilter.NewIPFilter("redis:6379", "my_rules")
    ```
 
 ## Installation and Running (Without Docker)

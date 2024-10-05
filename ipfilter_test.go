@@ -299,7 +299,7 @@ func TestExtendedIPFilter(t *testing.T) {
 				{Action: "allow", Target: "2606:2800:220:1:1:1::1"},
 				{Action: "deny", Target: "all"},
 			},
-			testIPs:  []string{"2606:2800:220:1::1", "2606:2800:220:1:1::1", "2606:2800:220:1:1:1::1", "2606:2800:220:2::1"},
+			testIPs:  []string{"2606:2800:220:1::1", "3606:2800:220:1:1::1", "2606:2800:220:1:1:1::1", "2606:2800:220:2::1"},
 			expected: []bool{true, false, true, false},
 		},
 		{
@@ -308,7 +308,7 @@ func TestExtendedIPFilter(t *testing.T) {
 				{Action: "allow", Target: "0.0.0.0/0"},
 				{Action: "deny", Target: "::/0"},
 			},
-			testIPs:  []string{"203.0.113.1", "198.51.100.1", "2001:db8::1", "2606:2800:220:1:1:1::1"},
+			testIPs:  []string{"213.0.113.1", "190.51.100.1", "2006:db8::1", "2606:2800:220:1:1:1::1"},
 			expected: []bool{true, true, false, false},
 		},
 		{
@@ -317,7 +317,7 @@ func TestExtendedIPFilter(t *testing.T) {
 				{Action: "allow", Target: "::/0"},
 				{Action: "deny", Target: "0.0.0.0/0"},
 			},
-			testIPs:  []string{"203.0.113.1", "198.51.100.1", "2001:db8::1", "2001:db8::2"},
+			testIPs:  []string{"213.0.113.1", "190.51.100.1", "2006:db8::1", "2006:db8::2"},
 			expected: []bool{false, false, true, true},
 		},
 		{
@@ -328,7 +328,7 @@ func TestExtendedIPFilter(t *testing.T) {
 				{Action: "allow", Target: "2001:db8:1:1:1::/96"},
 				{Action: "deny", Target: "all"},
 			},
-			testIPs:  []string{"2001:db8:1::1", "2001:db8:1:1::1", "2001:db8:1:1:1::1", "2001:db8:2::1", "2606:2800:220:1::1"},
+			testIPs:  []string{"2001:0db8:85a3:0000:0000:8a2e:0370:7334", "2001:0db8:85a3:0001:0000:8a2e:0370:7334", "2001:0db8:85a3:0001:0001:8a2e:0370:7334", "2001:0db8:85a4:0000:0000:8a2e:0370:7334", "2606:2800:220:1:248:1893:25c8:1946"},
 			expected: []bool{true, false, true, false, false},
 		},
 		{

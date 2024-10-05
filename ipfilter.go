@@ -61,22 +61,26 @@ type Rule struct {
 
 // IPFilter handles IP filtering operations
 type IPFilter struct {
-	client *redis.Client
+	client  *redis.Client
+	ruleKey string
 }
 
 // NewIPFilter creates a new IPFilter instance
-func NewIPFilter(redisAddr string) *IPFilter {
+func NewIPFilter(redisAddr string, ruleKey ...string) *IPFilter {
+	key := "ip_rules" // Default key
+	if len(ruleKey) > 0 && ruleKey[0] != "" {
+		key = ruleKey[0]
+	}
 	return &IPFilter{
-		client: redis.NewClient(&redis.Options{
-			Addr: redisAddr,
-		}),
+		client:  redis.NewClient(&redis.Options{Addr: redisAddr}),
+		ruleKey: key,
 	}
 }
 
 // LoadRules loads rules from Redis
 func (f *IPFilter) LoadRules() ([]Rule, error) {
 	ctx := context.Background()
-	ruleStrings, err := f.client.LRange(ctx, "ip_rules", 0, -1).Result()
+	ruleStrings, err := f.client.LRange(ctx, f.ruleKey, 0, -1).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load rules from Redis: %v", err)
 	}
@@ -140,15 +144,15 @@ func (f *IPFilter) IsAllowedIP(ip string) (bool, error) {
 	return false, nil
 }
 
-// AddRule adds a new rule to Redis
+// AppendRule adds a new rule to Redis
 func (f *IPFilter) AppendRule(rule Rule) (Rule, error) {
 	ctx := context.Background()
-	count, err := f.client.LLen(ctx, "ip_rules").Result()
+	count, err := f.client.LLen(ctx, f.ruleKey).Result()
 	if err != nil {
 		return Rule{}, fmt.Errorf("failed to get rule count: %w", err)
 	}
 	rule.Position = int(count)
-	err = f.client.RPush(ctx, "ip_rules", fmt.Sprintf("%s:%s", rule.Action, rule.Target)).Err()
+	err = f.client.RPush(ctx, f.ruleKey, fmt.Sprintf("%s:%s", rule.Action, rule.Target)).Err()
 	if err != nil {
 		return Rule{}, fmt.Errorf("failed to append rule: %w", err)
 	}
@@ -161,7 +165,7 @@ func (f *IPFilter) RemoveAllRules() error {
 	ctx := context.Background()
 	
 	// Delete the entire list of rules
-	err := f.client.Del(ctx, "ip_rules").Err()
+	err := f.client.Del(ctx, f.ruleKey).Err()
 	if err != nil {
 		return fmt.Errorf("failed to remove all rules: %w", err)
 	}
@@ -174,7 +178,7 @@ func (f *IPFilter) GetAllRules() ([]Rule, error) {
 	ctx := context.Background()
 	
 	// Retrieve all rules from the list
-	ruleStrings, err := f.client.LRange(ctx, "ip_rules", 0, -1).Result()
+	ruleStrings, err := f.client.LRange(ctx, f.ruleKey, 0, -1).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve rules: %w", err)
 	}
@@ -209,7 +213,7 @@ func (f *IPFilter) AddRuleAtPosition(rule Rule, position int) error {
 	ruleString := fmt.Sprintf("%s:%s", rule.Action, rule.Target)
 
 	// Get the current length of the list
-	length, err := f.client.LLen(ctx, "ip_rules").Result()
+	length, err := f.client.LLen(ctx, f.ruleKey).Result()
 	if err != nil {
 		return fmt.Errorf("failed to get list length: %w", err)
 	}
@@ -222,13 +226,13 @@ func (f *IPFilter) AddRuleAtPosition(rule Rule, position int) error {
 	// Use a transaction to ensure atomicity
 	_, err = f.client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
 		if int64(position) == length {
-			pipe.RPush(ctx, "ip_rules", ruleString)
+			pipe.RPush(ctx, f.ruleKey, ruleString)
 		} else {
-			pivot, err := f.client.LIndex(ctx, "ip_rules", int64(position)).Result()
+			pivot, err := f.client.LIndex(ctx, f.ruleKey, int64(position)).Result()
 			if err != nil {
 				return fmt.Errorf("failed to get pivot rule: %w", err)
 			}
-			pipe.LInsert(ctx, "ip_rules", "BEFORE", pivot, ruleString)
+			pipe.LInsert(ctx, f.ruleKey, "BEFORE", pivot, ruleString)
 		}
 		return nil
 	})
@@ -246,7 +250,7 @@ func (f *IPFilter) RemoveRuleAtPosition(position int) error {
 	ctx := context.Background()
 
 	// Get the current length of the list
-	length, err := f.client.LLen(ctx, "ip_rules").Result()
+	length, err := f.client.LLen(ctx, f.ruleKey).Result()
 	if err != nil {
 		return fmt.Errorf("failed to get list length: %w", err)
 	}
@@ -257,13 +261,13 @@ func (f *IPFilter) RemoveRuleAtPosition(position int) error {
 	}
 
 	// Get the rule at the specified position
-	rule, err := f.client.LIndex(ctx, "ip_rules", int64(position)).Result()
+	rule, err := f.client.LIndex(ctx, f.ruleKey, int64(position)).Result()
 	if err != nil {
 		return fmt.Errorf("failed to get rule at position %d: %w", position, err)
 	}
 
 	// Remove the rule
-	removed, err := f.client.LRem(ctx, "ip_rules", 1, rule).Result()
+	removed, err := f.client.LRem(ctx, f.ruleKey, 1, rule).Result()
 	if err != nil {
 		return fmt.Errorf("failed to remove rule at position %d: %w", position, err)
 	}
@@ -281,7 +285,7 @@ func (f *IPFilter) GetRuleAtPosition(position int) (*Rule, error) {
 	ctx := context.Background()
 
 	// Get the current length of the list
-	length, err := f.client.LLen(ctx, "ip_rules").Result()
+	length, err := f.client.LLen(ctx, f.ruleKey).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get list length: %w", err)
 	}
@@ -292,7 +296,7 @@ func (f *IPFilter) GetRuleAtPosition(position int) (*Rule, error) {
 	}
 
 	// Get the rule at the specified position
-	ruleString, err := f.client.LIndex(ctx, "ip_rules", int64(position)).Result()
+	ruleString, err := f.client.LIndex(ctx, f.ruleKey, int64(position)).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get rule at position %d: %w", position, err)
 	}
@@ -317,7 +321,7 @@ func (f *IPFilter) GetRuleCount() (int64, error) {
 	ctx := context.Background()
 	
 	// Get the current length of the list
-	count, err := f.client.LLen(ctx, "ip_rules").Result()
+	count, err := f.client.LLen(ctx, f.ruleKey).Result()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get rule count: %w", err)
 	}
@@ -347,7 +351,7 @@ func (f *IPFilter) updatePositions() error {
 	for i, rule := range rules {
 		if rule.Position != i {
 			ruleString := fmt.Sprintf("%s:%s", rule.Action, rule.Target)
-			err = f.client.LSet(ctx, "ip_rules", int64(i), ruleString).Err()
+			err = f.client.LSet(ctx, f.ruleKey, int64(i), ruleString).Err()
 			if err != nil {
 				return fmt.Errorf("failed to update rule position: %w", err)
 			}
@@ -365,4 +369,9 @@ func IsPrivateOrSpecialIP(ip net.IP) bool {
 		}
 	}
 	return false
+}
+
+// GetRuleKey returns the current rule key being used by the IPFilter
+func (f *IPFilter) GetRuleKey() string {
+	return f.ruleKey
 }

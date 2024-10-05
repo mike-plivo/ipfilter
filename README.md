@@ -63,6 +63,10 @@ To use this package in your Go project:
    ```go
    filter := ipfilter.NewIPFilter("redis:6379")
    ```
+   or
+   ```go
+   filter := ipfilter.NewIPFilter("redis:6379", "my_rules")
+   ```
 
 3. Add rules:
    ```go

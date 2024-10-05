@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 redis-server --daemonize yes
 sleep 1
 case "$1" in
@@ -10,9 +10,9 @@ case "$1" in
     echo "Running benchmarks..."
     /usr/local/go/bin/go test -bench=. .
     ;;
-  "shell"|"sh"|"bash")
+  "shell"|"sh")
     echo "Starting shell..."
-    /bin/bash
+    /bin/sh
     ;;
   "examples")
     echo "Running examples..."

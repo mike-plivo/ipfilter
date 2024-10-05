@@ -7,6 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type testingT interface {
+	Error(args ...interface{})
+}
+
 func getRedisURL() string {
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
@@ -15,9 +19,11 @@ func getRedisURL() string {
 	return redisURL
 }
 
-func cleanupRules(t *testing.T, filter *IPFilter) {
+func cleanupRules(t testingT, filter *IPFilter) {
 	err := filter.RemoveAllRules()
-	assert.NoError(t, err, "Failed to remove all rules during cleanup")
+	if err != nil {
+		t.Error("Failed to remove all rules during cleanup:", err)
+	}
 }
 
 func TestIPFilter(t *testing.T) {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -54,6 +53,6 @@ func main() {
 			log.Printf("Error checking IP %s: %v\n", ip, err)
 			continue
 		}
-		fmt.Printf("IP %s is %s\n", ip, map[bool]string{true: "allowed", false: "denied"}[allowed])
+		log.Printf("IP %s is %s\n", ip, map[bool]string{true: "allowed", false: "denied"}[allowed])
 	}
 }

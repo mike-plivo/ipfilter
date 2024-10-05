@@ -113,7 +113,7 @@ func (f *IPFilter) IsAllowedIP(ip string) (bool, error) {
 	}
 
 	// Add a check for private or special IP addresses
-	if isPrivateOrSpecialIP(ipAddr) {
+	if IsPrivateOrSpecialIP(ipAddr) {
 		return false, nil
 	}
 
@@ -357,8 +357,8 @@ func (f *IPFilter) updatePositions() error {
 	return nil
 }
 
-// isPrivateOrSpecialIP checks if the given IP is private or in a special block
-func isPrivateOrSpecialIP(ip net.IP) bool {
+// IsPrivateOrSpecialIP checks if the given IP is private or in a special block
+func IsPrivateOrSpecialIP(ip net.IP) bool {
 	for _, ipNet := range allBlocks {
 		if ipNet.Contains(ip) {
 			return true

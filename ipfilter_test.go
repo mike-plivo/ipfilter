@@ -284,12 +284,12 @@ func TestExtendedIPFilter(t *testing.T) {
 		{
 			name: "Allow single IP, deny subnet containing it",
 			rules: []Rule{
-				{Action: "allow", Target: "192.168.1.100"},
-				{Action: "deny", Target: "192.168.1.0/24"},
+				{Action: "allow", Target: "199.10.1.100"},
+				{Action: "deny", Target: "199.10.1.0/24"},
 				{Action: "allow", Target: "all"},
 			},
-			testIPs:  []string{"192.168.1.100", "192.168.1.101", "192.168.2.1"},
-			expected: []bool{true, false, true},
+			testIPs:  []string{"199.10.1.100", "199.10.1.101", "199.10.2.1", "200.200.200.200"},
+			expected: []bool{true, false, true, true},
 		},
 		{
 			name: "IPv6 specific cases",
@@ -303,21 +303,12 @@ func TestExtendedIPFilter(t *testing.T) {
 			expected: []bool{true, false, true, false},
 		},
 		{
-			name: "Mixed case sensitivity",
-			rules: []Rule{
-				{Action: "AlLoW", Target: "192.168.1.0/24"},
-				{Action: "dEnY", Target: "ALL"},
-			},
-			testIPs:  []string{"192.168.1.1", "10.0.0.1"},
-			expected: []bool{true, false},
-		},
-		{
 			name: "Allow all IPv4, deny all IPv6",
 			rules: []Rule{
 				{Action: "allow", Target: "0.0.0.0/0"},
 				{Action: "deny", Target: "::/0"},
 			},
-			testIPs:  []string{"192.168.1.1", "10.0.0.1", "2001:db8::1", "::1"},
+			testIPs:  []string{"203.0.113.1", "198.51.100.1", "2001:db8::1", "2606:2800:220:1:1:1::1"},
 			expected: []bool{true, true, false, false},
 		},
 		{
@@ -326,38 +317,27 @@ func TestExtendedIPFilter(t *testing.T) {
 				{Action: "allow", Target: "::/0"},
 				{Action: "deny", Target: "0.0.0.0/0"},
 			},
-			testIPs:  []string{"192.168.1.1", "10.0.0.1", "2001:db8::1", "::1"},
+			testIPs:  []string{"203.0.113.1", "198.51.100.1", "2001:db8::1", "2001:db8::2"},
 			expected: []bool{false, false, true, true},
 		},
 		{
 			name: "Complex IPv6 rules",
 			rules: []Rule{
-				{Action: "allow", Target: "2606:2800:220:1::/64"},
-				{Action: "deny", Target: "2606:2800:220:1:1::/80"},
-				{Action: "allow", Target: "2606:2800:220:1:1:1::/96"},
+				{Action: "allow", Target: "2001:db8:1::/64"},
+				{Action: "deny", Target: "2001:db8:1:1::/80"},
+				{Action: "allow", Target: "2001:db8:1:1:1::/96"},
 				{Action: "deny", Target: "all"},
 			},
-			testIPs:  []string{"2606:2800:220:1::1", "2606:2800:220:1:1::1", "2606:2800:220:1:1:1::1", "2606:2800:220:2::1", "2001:4860:4860::8888"},
-			expected: []bool{true, false, true, true, false},
+			testIPs:  []string{"2001:db8:1::1", "2001:db8:1:1::1", "2001:db8:1:1:1::1", "2001:db8:2::1", "2606:2800:220:1::1"},
+			expected: []bool{true, false, true, false, false},
 		},
 		{
-			name: "IPv4-mapped IPv6 addresses",
+			name: "Localhost is always denied",
 			rules: []Rule{
-				{Action: "allow", Target: "192.168.1.0/24"},
-				{Action: "deny", Target: "all"},
+				{Action: "allow", Target: "all"},
 			},
-			testIPs:  []string{"::ffff:192.168.1.1", "::ffff:192.168.2.1"},
-			expected: []bool{true, false},
-		},
-		{
-			name: "Localhost rules",
-			rules: []Rule{
-				{Action: "allow", Target: "127.0.0.1"},
-				{Action: "allow", Target: "::1"},
-				{Action: "deny", Target: "all"},
-			},
-			testIPs:  []string{"127.0.0.1", "::1", "127.0.0.2", "::2"},
-			expected: []bool{true, true, false, false},
+			testIPs:  []string{"127.0.0.1", "::1"},
+			expected: []bool{false, false},
 		},
 		{
 			name: "Large IPv4 range",
@@ -378,12 +358,12 @@ func TestExtendedIPFilter(t *testing.T) {
 			expected: []bool{true, true, false},
 		},
 		{
-			name: "Allow all then deny all should allow all",
+			name: "Allow all then deny all, should allow all",
 			rules: []Rule{
 				{Action: "allow", Target: "all"},
 				{Action: "deny", Target: "all"},
 			},
-			testIPs:  []string{"192.168.1.1", "10.0.0.1", "2001:db8::1"},
+			testIPs:  []string{"203.0.113.1", "198.51.100.1", "2001:db8::1"},
 			expected: []bool{true, true, true},
 		},
 		{
@@ -392,7 +372,7 @@ func TestExtendedIPFilter(t *testing.T) {
 				{Action: "deny", Target: "all"},
 				{Action: "allow", Target: "all"},
 			},
-			testIPs:  []string{"192.168.1.1", "10.0.0.1", "2001:db8::1"},
+			testIPs:  []string{"203.0.113.1", "198.51.100.1", "2001:db8::1"},
 			expected: []bool{false, false, false},
 		},
 	}

@@ -1,5 +1,5 @@
 # Use the official Go image as the base image
-FROM golang:1.20
+FROM golang:1.13
 
 # Install Redis
 RUN apt-get update && apt-get install -y redis-server

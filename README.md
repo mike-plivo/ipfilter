@@ -22,9 +22,11 @@ The IP filter works by maintaining a list of rules in Redis. Each rule consists 
 When an IP address is checked against the filter:
 
 1. If the IP is a private or special address (e.g., loopback, multicast), it's automatically denied.
-2. If there are no rules, the IP is allowed.
-3. Rules are checked in order. The first matching rule determines whether the IP is allowed or denied.
-4. If no rules match, the IP is denied by default.
+2. If there are no rules loaded from Redis, all IPs are allowed.
+3. Rules are checked in order. 
+4. The first rule that matches the IP determines whether the IP is allowed or denied.
+5. If the IP matches a rule, no other rules are checked, even if next rules would have matched the IP as well.
+6. If the IP does not match any rule, the IP is denied by default.
 
 ### Private and Special IP Filtering
 

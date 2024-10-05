@@ -89,6 +89,15 @@ func TestIPFilter(t *testing.T) {
 	ruleCount, err = filter.GetRuleCount()
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), ruleCount)
+
+	// Test custom ruleKey
+	customRuleKey := "custom_ip_rules"
+	customFilter := NewIPFilter(getRedisURL(), customRuleKey)
+	assert.Equal(t, customRuleKey, customFilter.GetRuleKey(), "Custom rule key not set correctly")
+
+	// Test default ruleKey
+	defaultFilter := NewIPFilter(getRedisURL())
+	assert.Equal(t, "ip_rules", defaultFilter.GetRuleKey(), "Default rule key not set correctly")
 }
 
 func TestValidateRule(t *testing.T) {

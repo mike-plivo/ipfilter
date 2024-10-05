@@ -3,7 +3,6 @@ package ipfilter
 import (
 	"os"
 	"testing"
-	"log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,10 +29,8 @@ func TestIPFilter(t *testing.T) {
 	// Test adding rules
 	rule1 := Rule{Action: "allow", Target: "93.184.216.0/24"}
 	rule2 := Rule{Action: "deny", Target: "8.8.8.8"}
-	
 	_, err := filter.AppendRule(rule1)
 	assert.NoError(t, err)
-	
 	_, err = filter.AppendRule(rule2)
 	assert.NoError(t, err)
 

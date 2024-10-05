@@ -114,7 +114,7 @@ func (f *IPFilter) IsAllowedIP(ip string) (bool, error) {
 
 	// Add a check for private or special IP addresses
 	if isPrivateOrSpecialIP(ipAddr) {
-		return false, fmt.Errorf("private or special IP addresses are not allowed: %s", ip)
+		return false, nil
 	}
 
 	for _, rule := range rules {

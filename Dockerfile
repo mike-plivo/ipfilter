@@ -1,8 +1,8 @@
 # Use the official Go image as the base image
-FROM golang:1.13
+FROM golang:1.13-alpine
 
 # Install Redis
-RUN apt-get update && apt-get install -y redis-server
+RUN apk update && apk add redis
 
 # Set the working directory inside the container
 WORKDIR /app

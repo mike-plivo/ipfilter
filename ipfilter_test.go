@@ -10,7 +10,7 @@ import (
 func getRedisURL() string {
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		log.Fatalf("REDIS_URL is not set")
+		redisURL = "localhost:6379"
 	}
 	return redisURL
 }

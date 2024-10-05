@@ -118,7 +118,10 @@ func (f *IPFilter) IsAllowedIP(ip string) (bool, error) {
 	}
 
 	for _, rule := range rules {
-		if rule.Target == "all" || rule.Target == ip {
+		if rule.Target == "all" {
+			return rule.Action == "allow", nil
+		}
+		if rule.Target == ip {
 			return rule.Action == "allow", nil
 		}
 

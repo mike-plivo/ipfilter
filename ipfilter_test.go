@@ -271,13 +271,14 @@ func TestExtendedIPFilter(t *testing.T) {
 			name: "Complex rule set",
 			rules: []Rule{
 				{Action: "allow", Target: "93.184.0.0/16"},
-				{Action: "deny", Target: "93.184.1.0/24"},
-				{Action: "allow", Target: "93.184.1.1/32"},
+				{Action: "deny", Target: "200.200.200.0/24"},
+				{Action: "allow", Target: "99.184.1.1/32"},
+				{Action: "deny", Target: "99.184.1.0/24"},
 				{Action: "allow", Target: "2606:2800:220:1::/64"},
 				{Action: "deny", Target: "2606:2800:220:1:1::/80"},
 				{Action: "deny", Target: "all"},
 			},
-			testIPs:  []string{"93.184.0.1", "93.184.1.0", "93.184.1.1", "192.168.1.1", "2606:2800:220:1::1", "2606:2800:220:1:1::1", "2001:4860:4860::8888"},
+			testIPs:  []string{"93.184.0.1", "200.200.200.200", "99.184.1.1", "99.184.1.2", "2606:2800:220:1::1", "2606:2800:220:1:1::1", "2001:4860:4860::8888"},
 			expected: []bool{true, false, true, false, true, false, false},
 		},
 		{

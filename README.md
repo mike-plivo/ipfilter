@@ -117,18 +117,52 @@ To use this package in your Go project:
    go mod download
    ```
 
-4. Run tests:
-   ```
-   go test ./...
-   ```
-
 ## Testing
 
 To run tests for this package, you can use the standard Go testing tools:
 
 ```
-go test ./...
+go test .
 ```
+
+## Benchmarking
+
+To run benchmarks for this package, you can use the standard Go benchmarking tools:
+
+```
+go test -bench=. .
+```
+
+## Docker Usage
+
+You can use Docker to build, test, and benchmark this package. Here's how:
+
+1. Build the Docker image:
+   ```
+   docker build -t ipfilter .
+   ```
+
+2. Run tests:
+   ```
+   docker run --rm ipfilter test
+   ```
+
+3. Run benchmarks:
+   ```
+   docker run --rm ipfilter benchmark
+   ```
+
+4. Run examples:
+   ```
+   docker run --rm ipfilter examples
+   ```
+
+5. Start a shell in the container:
+   ```
+   docker run --rm -it ipfilter shell
+   ```
+
+These commands utilize the `start.sh` script in the container to execute different actions based on the provided argument.
 
 ## Contributing
 

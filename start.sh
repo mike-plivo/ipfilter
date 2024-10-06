@@ -1,6 +1,4 @@
 #!/bin/sh
-redis-server --daemonize yes
-sleep 1
 case "$1" in
   "test")
     echo "Running tests in the current directory..."

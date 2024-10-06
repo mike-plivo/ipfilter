@@ -1,8 +1,7 @@
 # Use the official Go image as the base image
 FROM golang:1.13-alpine
 
-# Install Redis
-RUN apk update && apk --no-cache add redis gcc make build-base
+RUN apk update && apk --no-cache add gcc make build-base
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -22,6 +21,6 @@ COPY . .
 # Make the start.sh script executable
 RUN chmod +x /app/start.sh
 
-# Command to run Redis and the specified task
+# Update the ENTRYPOINT and CMD
 ENTRYPOINT ["/app/start.sh"]
 CMD ["test"]

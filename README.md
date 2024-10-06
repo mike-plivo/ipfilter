@@ -55,7 +55,7 @@ To use this package in your Go project:
 
 1. Import the package:
    ```go
-   import "github.com/your-username/ipfilter"
+   import "github.com/mike-plivo/ipfilter"
    ```
 
 2. Create a new IPFilter instance:

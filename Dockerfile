@@ -1,8 +1,7 @@
 # Use the official Go image as the base image
 FROM golang:1.13-alpine
 
-# Remove Redis installation
-# RUN apk update && apk --no-cache add redis gcc make build-base
+RUN apk update && apk --no-cache add gcc make build-base
 
 # Set the working directory inside the container
 WORKDIR /app

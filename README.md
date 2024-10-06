@@ -108,7 +108,7 @@ To use this package in your Go project:
 
 2. Clone the repository:
    ```
-   git clone https://github.com/your-username/ipfilter.git
+   git clone https://github.com/mike-plivo/ipfilter.git
    cd ipfilter
    ```
 

@@ -1,12 +1,12 @@
 package ipfilter
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
-	"github.com/go-redis/redis/v8"
 )
+
 // allBlocks contains all private and special IP ranges
 var allBlocks []*net.IPNet
 
@@ -54,66 +54,45 @@ func init() {
 
 // Rule represents an IP filtering rule
 type Rule struct {
-	Action   string // "allow" or "deny"
-	Target   string // IP, CIDR, or "all"
-	Position int    // Position of the rule in the list
+	Action string `json:"action"` // "allow" or "deny"
+	Target string `json:"target"` // IP, CIDR, or "all"
 }
+
+// Slice is a custom type for a slice of Rules
+type Slice []Rule
 
 // IPFilter handles IP filtering operations
 type IPFilter struct {
-	client  *redis.Client
-	ruleKey string
+	rules Slice
 }
 
-// NewIPFilter creates a new IPFilter instance
-func NewIPFilter(redisAddr string, ruleKey ...string) *IPFilter {
-	key := "ip_rules" // Default key
-	if len(ruleKey) > 0 && ruleKey[0] != "" {
-		key = ruleKey[0]
-	}
-	return &IPFilter{
-		client:  redis.NewClient(&redis.Options{Addr: redisAddr}),
-		ruleKey: key,
-	}
-}
-
-// LoadRules loads rules from Redis
-func (f *IPFilter) LoadRules() ([]Rule, error) {
-	ctx := context.Background()
-	ruleStrings, err := f.client.LRange(ctx, f.ruleKey, 0, -1).Result()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load rules from Redis: %v", err)
+// NewIPFilter creates a new IPFilter instance from a JSON string
+func NewIPFilter(jsonData string) (*IPFilter, error) {
+	var rules Slice
+	if err := json.Unmarshal([]byte(jsonData), &rules); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON data: %w", err)
 	}
 
-	rules := make([]Rule, 0, len(ruleStrings))
-	for i, ruleStr := range ruleStrings {
-		parts := strings.SplitN(ruleStr, ":", 2)
-		if len(parts) != 2 {
-			continue
+	// Validate rules
+	for i, rule := range rules {
+		if err := ValidateRule(rule); err != nil {
+			return nil, fmt.Errorf("invalid rule at position %d: %w", i, err)
 		}
-		rules = append(rules, Rule{Action: parts[0], Target: parts[1], Position: i})
 	}
 
-	return rules, nil
+	return &IPFilter{rules: rules}, nil
 }
 
 // IsAllowedIP tests one IP against the rules and returns if it's allowed or denied
 func (f *IPFilter) IsAllowedIP(ip string) (bool, error) {
-	rules, err := f.LoadRules()
-
-	// if there is an error, allow the traffic
-	if err != nil {
-		return true, err
-	}
-
-	// If there are no rules, allow the traffic
-	if len(rules) == 0 {
-		return true, nil
-	}
-
 	ipAddr := net.ParseIP(ip)
 	if ipAddr == nil {
 		return false, fmt.Errorf("invalid IP address: %s", ip)
+	}
+
+	// If no rules are set, allow all
+	if len(f.rules) == 0 {
+		return true, nil
 	}
 
 	// Add a check for private or special IP addresses
@@ -121,7 +100,7 @@ func (f *IPFilter) IsAllowedIP(ip string) (bool, error) {
 		return false, nil
 	}
 
-	for _, rule := range rules {
+	for _, rule := range f.rules {
 		if rule.Target == "all" {
 			return rule.Action == "allow", nil
 		}
@@ -144,189 +123,56 @@ func (f *IPFilter) IsAllowedIP(ip string) (bool, error) {
 	return false, nil
 }
 
-// AppendRule adds a new rule to Redis
-func (f *IPFilter) AppendRule(rule Rule) (Rule, error) {
-	ctx := context.Background()
-	count, err := f.client.LLen(ctx, f.ruleKey).Result()
-	if err != nil {
-		return Rule{}, fmt.Errorf("failed to get rule count: %w", err)
+// Append adds a new rule to the end of the rules list
+func (s *Slice) Append(rule Rule) error {
+	if err := ValidateRule(rule); err != nil {
+		return err
 	}
-	rule.Position = int(count)
-	err = f.client.RPush(ctx, f.ruleKey, fmt.Sprintf("%s:%s", rule.Action, rule.Target)).Err()
-	if err != nil {
-		return Rule{}, fmt.Errorf("failed to append rule: %w", err)
-	}
-	return rule, nil
-}
-
-
-// RemoveAllRules removes all rules from Redis
-func (f *IPFilter) RemoveAllRules() error {
-	ctx := context.Background()
-	
-	// Delete the entire list of rules
-	err := f.client.Del(ctx, f.ruleKey).Err()
-	if err != nil {
-		return fmt.Errorf("failed to remove all rules: %w", err)
-	}
-	
+	*s = append(*s, rule)
 	return nil
 }
 
-// GetAllRules retrieves all rules from Redis
-func (f *IPFilter) GetAllRules() ([]Rule, error) {
-	ctx := context.Background()
-	
-	// Retrieve all rules from the list
-	ruleStrings, err := f.client.LRange(ctx, f.ruleKey, 0, -1).Result()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve rules: %w", err)
-	}
-	
-	rules := make([]Rule, 0, len(ruleStrings))
-	for i, ruleString := range ruleStrings {
-		parts := strings.SplitN(ruleString, ":", 2)
-		if len(parts) != 2 {
-			continue // Skip invalid rules
-		}
-		rule := Rule{
-			Action:   parts[0],
-			Target:   parts[1],
-			Position: i,
-		}
-		rules = append(rules, rule)
-	}
-	
-	return rules, nil
+// RemoveAll removes all rules
+func (s *Slice) RemoveAll() {
+	*s = Slice{}
 }
 
-// AddRuleAtPosition adds a rule at a specific position in the list
-func (f *IPFilter) AddRuleAtPosition(rule Rule, position int) error {
-	ctx := context.Background()
-
-	// Validate the rule
+// Insert adds a rule at a specific position in the list
+func (s *Slice) Insert(rule Rule, position int) error {
 	if err := ValidateRule(rule); err != nil {
 		return err
 	}
 
-	// Convert rule to string
-	ruleString := fmt.Sprintf("%s:%s", rule.Action, rule.Target)
-
-	// Get the current length of the list
-	length, err := f.client.LLen(ctx, f.ruleKey).Result()
-	if err != nil {
-		return fmt.Errorf("failed to get list length: %w", err)
-	}
-
-	// Check if the position is valid
-	if position < 0 || int64(position) > length {
+	if position < 0 || position > len(*s) {
 		return fmt.Errorf("invalid position: %d", position)
 	}
 
-	// Use a transaction to ensure atomicity
-	_, err = f.client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
-		if int64(position) == length {
-			pipe.RPush(ctx, f.ruleKey, ruleString)
-		} else {
-			pivot, err := f.client.LIndex(ctx, f.ruleKey, int64(position)).Result()
-			if err != nil {
-				return fmt.Errorf("failed to get pivot rule: %w", err)
-			}
-			pipe.LInsert(ctx, f.ruleKey, "BEFORE", pivot, ruleString)
-		}
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to add rule at position %d: %w", position, err)
-	}
-
-	// Update positions of all rules
-	return f.updatePositions()
+	*s = append((*s)[:position], append([]Rule{rule}, (*s)[position:]...)...)
+	return nil
 }
 
-// RemoveRuleAtPosition removes a rule at a specific position in the list
-func (f *IPFilter) RemoveRuleAtPosition(position int) error {
-	ctx := context.Background()
-
-	// Get the current length of the list
-	length, err := f.client.LLen(ctx, f.ruleKey).Result()
-	if err != nil {
-		return fmt.Errorf("failed to get list length: %w", err)
-	}
-
-	// Check if the position is valid
-	if position < 0 || int64(position) >= length {
+// Remove removes a rule at a specific position in the list
+func (s *Slice) Remove(position int) error {
+	if position < 0 || position >= len(*s) {
 		return fmt.Errorf("invalid position: %d", position)
 	}
 
-	// Get the rule at the specified position
-	rule, err := f.client.LIndex(ctx, f.ruleKey, int64(position)).Result()
-	if err != nil {
-		return fmt.Errorf("failed to get rule at position %d: %w", position, err)
-	}
-
-	// Remove the rule
-	removed, err := f.client.LRem(ctx, f.ruleKey, 1, rule).Result()
-	if err != nil {
-		return fmt.Errorf("failed to remove rule at position %d: %w", position, err)
-	}
-
-	if removed == 0 {
-		return fmt.Errorf("rule not found at position %d", position)
-	}
-
-	// Update positions of remaining rules
-	return f.updatePositions()
+	*s = append((*s)[:position], (*s)[position+1:]...)
+	return nil
 }
 
-// GetRuleAtPosition retrieves a rule at a specific position from Redis
-func (f *IPFilter) GetRuleAtPosition(position int) (*Rule, error) {
-	ctx := context.Background()
-
-	// Get the current length of the list
-	length, err := f.client.LLen(ctx, f.ruleKey).Result()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get list length: %w", err)
-	}
-
-	// Check if the position is valid
-	if position < 0 || int64(position) >= length {
+// Get retrieves a rule at a specific position
+func (s *Slice) Get(position int) (*Rule, error) {
+	if position < 0 || position >= len(*s) {
 		return nil, fmt.Errorf("invalid position: %d", position)
 	}
 
-	// Get the rule at the specified position
-	ruleString, err := f.client.LIndex(ctx, f.ruleKey, int64(position)).Result()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get rule at position %d: %w", position, err)
-	}
-
-	// Parse the rule string
-	parts := strings.SplitN(ruleString, ":", 2)
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid rule format at position %d", position)
-	}
-
-	rule := &Rule{
-		Action:   parts[0],
-		Target:   parts[1],
-		Position: position,
-	}
-
-	return rule, nil
+	return &(*s)[position], nil
 }
 
-// GetRuleCount returns the number of rules in Redis
-func (f *IPFilter) GetRuleCount() (int64, error) {
-	ctx := context.Background()
-	
-	// Get the current length of the list
-	count, err := f.client.LLen(ctx, f.ruleKey).Result()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get rule count: %w", err)
-	}
-	
-	return count, nil
+// Len returns the number of rules
+func (s *Slice) Len() int {
+	return len(*s)
 }
 
 // ValidateRule ensures the rule is valid
@@ -340,25 +186,13 @@ func ValidateRule(rule Rule) error {
 	return nil
 }
 
-// updatePositions updates the positions of all rules
-func (f *IPFilter) updatePositions() error {
-	rules, err := f.GetAllRules()
+// ToJSON converts the IPFilter rules to a JSON string
+func (f *IPFilter) ToJSON() (string, error) {
+	jsonData, err := json.Marshal(f.rules)
 	if err != nil {
-		return fmt.Errorf("failed to get all rules: %w", err)
+		return "", fmt.Errorf("failed to convert rules to JSON: %w", err)
 	}
-
-	ctx := context.Background()
-	for i, rule := range rules {
-		if rule.Position != i {
-			ruleString := fmt.Sprintf("%s:%s", rule.Action, rule.Target)
-			err = f.client.LSet(ctx, f.ruleKey, int64(i), ruleString).Err()
-			if err != nil {
-				return fmt.Errorf("failed to update rule position: %w", err)
-			}
-		}
-	}
-
-	return nil
+	return string(jsonData), nil
 }
 
 // IsPrivateOrSpecialIP checks if the given IP is private or in a special block
@@ -371,7 +205,32 @@ func IsPrivateOrSpecialIP(ip net.IP) bool {
 	return false
 }
 
-// GetRuleKey returns the current rule key being used by the IPFilter
-func (f *IPFilter) GetRuleKey() string {
-	return f.ruleKey
+// Convenience methods for IPFilter to delegate to Slice
+
+func (f *IPFilter) AppendRule(rule Rule) error {
+	return f.rules.Append(rule)
+}
+
+func (f *IPFilter) RemoveAllRules() {
+	f.rules.RemoveAll()
+}
+
+func (f *IPFilter) GetAllRules() Slice {
+	return f.rules
+}
+
+func (f *IPFilter) AddRuleAtPosition(rule Rule, position int) error {
+	return f.rules.Insert(rule, position)
+}
+
+func (f *IPFilter) RemoveRuleAtPosition(position int) error {
+	return f.rules.Remove(position)
+}
+
+func (f *IPFilter) GetRuleAtPosition(position int) (*Rule, error) {
+	return f.rules.Get(position)
+}
+
+func (f *IPFilter) GetRuleCount() int {
+	return f.rules.Len()
 }

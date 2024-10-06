@@ -2,42 +2,26 @@ package main
 
 import (
 	"log"
-	"os"
 
 	"github.com/mike-plivo/ipfilter"
 )
 
-func getRedisURL() string {
-	redisURL := os.Getenv("REDIS_URL")
-	if redisURL == "" {
-		redisURL = "localhost:6379"
-	}
-	return redisURL
-}
-
 func main() {
-	redisAddr := getRedisURL()
-	filter := ipfilter.NewIPFilter(redisAddr)
+	// JSON string containing the rules
+	rulesJSON := `[
+		{"action": "allow", "target": "1.1.1.1"},
+		{"action": "deny", "target": "1.1.1.2"},
+		{"action": "allow", "target": "1.1.1.3"},
+		{"action": "allow", "target": "2.2.2.0/24"},
+		{"action": "allow", "target": "2001:db8::/32"},
+		{"action": "deny", "target": "2001:db8:1234::/48"},
+		{"action": "deny", "target": "all"}
+	]`
 
-	// Example: Add rules
-	rules := []ipfilter.Rule{
-		{Action: "allow", Target: "1.1.1.1"},
-		{Action: "deny", Target: "1.1.1.2"},
-		{Action: "allow", Target: "1.1.1.3"},
-		{Action: "allow", Target: "2.2.2.0/24"},
-		{Action: "allow", Target: "2001:db8::/32"},
-		{Action: "deny", Target: "2001:db8:1234::/48"},
-		{Action: "deny", Target: "all"},
-	}
-
-	// Add rules and handle errors
-	for _, rule := range rules {
-		addedRule, err := filter.AppendRule(rule)
-		if err != nil {
-			log.Printf("Error adding rule %v: %v\n", rule, err)
-		} else {
-			log.Printf("Added rule: %+v\n", addedRule)
-		}
+	// Create new IPFilter
+	filter, err := ipfilter.NewIPFilter(rulesJSON)
+	if err != nil {
+		log.Fatalf("Error creating IPFilter: %v", err)
 	}
 
 	// Example: Test IPs
@@ -54,5 +38,26 @@ func main() {
 			continue
 		}
 		log.Printf("IP %s is %s\n", ip, map[bool]string{true: "allowed", false: "denied"}[allowed])
+	}
+
+	// Example: Add a new rule
+	newRule := ipfilter.Rule{Action: "allow", Target: "4.4.4.4"}
+	err = filter.AppendRule(newRule)
+	if err != nil {
+		log.Printf("Error adding new rule: %v\n", err)
+	} else {
+		log.Printf("Added new rule: %+v\n", newRule)
+	}
+
+	// Print the final set of rules
+	finalRules := filter.GetAllRules()
+	log.Printf("Final rules: %+v\n", finalRules)
+
+	// Convert final rules to JSON
+	finalJSON, err := filter.ToJSON()
+	if err != nil {
+		log.Printf("Error converting rules to JSON: %v\n", err)
+	} else {
+		log.Printf("Final rules JSON: %s\n", finalJSON)
 	}
 }

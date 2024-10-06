@@ -70,7 +70,7 @@ type IPFilter struct {
 func NewIPFilter(jsonData string) (*IPFilter, error) {
 	var rules Slice
 	if err := json.Unmarshal([]byte(jsonData), &rules); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON data: %w", err)
+		return nil, fmt.Errorf("failed to parse JSON data: %w\n%s", err, jsonData)
 	}
 
 	// Validate rules

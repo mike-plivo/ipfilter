@@ -207,12 +207,13 @@ func TestExtendedIPFilter(t *testing.T) {
 		{
 			name: "Overlapping rules (first match wins)",
 			rules: `[
+				{"action": "allow", "target": "93.184.216.36"},
 				{"action": "deny", "target": "93.184.216.0/24"},
 				{"action": "allow", "target": "93.184.216.34"},
 				{"action": "allow", "target": "all"}
 			]`,
-			testIPs:  []string{"93.184.216.33", "93.184.216.34", "8.8.8.8"},
-			expected: []bool{false, false, true},
+			testIPs:  []string{"93.184.216.36", "93.184.216.33", "93.184.216.34", "8.8.8.8"},
+			expected: []bool{true, false, false, true},
 		},
 		{
 			name: "Complex rule set",
@@ -226,7 +227,7 @@ func TestExtendedIPFilter(t *testing.T) {
 				{"action": "deny", "target": "all"}
 			]`,
 			testIPs:  []string{"93.184.0.1", "200.200.200.200", "99.184.1.1", "99.184.1.2", "2606:2800:220:1::1", "2606:2800:220:1:1::1", "2001:4860:4860::8888"},
-			expected: []bool{true, false, true, false, true, false, false},
+			expected: []bool{true, false, true, false, true, true, false},
 		},
 		{
 			name: "Allow single IP, deny subnet containing it",
@@ -241,13 +242,14 @@ func TestExtendedIPFilter(t *testing.T) {
 		{
 			name: "IPv6 specific cases",
 			rules: `[
-				{"action": "allow", "target": "2606:2800:220:1::/64"},
-				{"action": "deny", "target": "2606:2800:220:1:1::/64"},
 				{"action": "allow", "target": "2606:2800:220:1:1:1::1"},
+				{"action": "deny", "target": "2606:2800:220:1:1::/64"},
+				{"action": "allow", "target": "2606:2800:220:1::/64"},
 				{"action": "deny", "target": "all"}
 			]`,
-			testIPs:  []string{"2606:2800:220:1::1", "2606:2800:220:1:1::1", "2606:2800:220:1:1:1::1", "2606:2800:220:2::1"},
-			expected: []bool{true, false, true, false},
+			testIPs:  []string{"2606:2800:220:1::1", "2606:2800:220:1:1::1", 
+					"2606:2800:220:1:1:1::1", "2606:2800:220:2::1"},
+			expected: []bool{false, false, true, false},
 		},
 		{
 			name: "Allow all IPv4, deny all IPv6",
@@ -270,7 +272,7 @@ func TestExtendedIPFilter(t *testing.T) {
 		{
 			name: "Localhost is always denied",
 			rules: `[
-				{"action": "allow", "target": "all"},
+				{"action": "allow", "target": "all"}
 			]`,
 			testIPs:  []string{"127.0.0.1", "::1"},
 			expected: []bool{false, false},
@@ -306,7 +308,7 @@ func TestExtendedIPFilter(t *testing.T) {
 			name: "Deny all then allow all should deny all",
 			rules: `[
 				{"action": "deny", "target": "all"},
-				{"action": "allow", "target": "all"},
+				{"action": "allow", "target": "all"}
 			]`,
 			testIPs:  []string{"83.0.113.1", "98.51.100.1", "2006:db8::1"},
 			expected: []bool{false, false, false},

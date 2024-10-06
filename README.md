@@ -1,31 +1,30 @@
 # IP Filter Package
 
-This package provides an IP filtering system using Redis as a backend for storing and managing rules. It allows for dynamic IP filtering based on a set of rules that can be easily managed and updated.
+This package provides an in-memory IP filtering system. It allows for dynamic IP filtering based on a set of rules that can be easily managed and updated.
 
 ## Features
 
 - Allow or deny specific IP addresses or CIDR ranges
 - Automatic filtering of private and special IP ranges
-- Redis-backed rule storage for persistence and scalability
-- Docker setup for easy testing and deployment
+- In-memory rule storage for fast access
+- JSON serialization and deserialization of rules
 
 ## How It Works
 
 ### IP Filter Logic
 
-The IP filter works by maintaining a list of rules in Redis. Each rule consists of:
+The IP filter works by maintaining a list of rules in memory. Each rule consists of:
 
 - Action: "allow" or "deny"
 - Target: An IP address, CIDR range, or "all" (which applies to all IPs)
-- Position: The order in which the rule is applied
 
 When an IP address is checked against the filter:
 
-1. If the IP is a private or special address (e.g., loopback, multicast), it's automatically denied.
-2. If there are no rules loaded from Redis, all IPs are allowed.
+1. If there are no rules, all IPs are allowed.
+2. If the IP is a private or special address (e.g., loopback, multicast), it's automatically denied.
 3. Rules are checked in order. 
 4. The first rule that matches the IP determines whether the IP is allowed or denied.
-5. If the IP matches a rule, no other rules are checked, even if next rules would have matched the IP as well.
+5. If the IP matches a rule, no other rules are checked.
 6. If the IP does not match any rule, the IP is denied by default.
 
 ### Private and Special IP Filtering
@@ -40,7 +39,7 @@ This function is used in the `IsAllowedIP` method to automatically deny access t
 
 ### Rule Management
 
-The package provides functions to:
+The package provides methods to:
 
 - Add rules (append or at a specific position)
 - Remove rules
@@ -48,7 +47,7 @@ The package provides functions to:
 - Count rules
 - Remove all rules
 
-Rules are stored in Redis as a list, allowing for efficient management and retrieval.
+Rules are stored in memory as a slice, allowing for efficient management and retrieval.
 
 ## Usage
 
@@ -56,25 +55,19 @@ To use this package in your Go project:
 
 1. Import the package:
    ```go
-   import "github.com/mike-plivo/ipfilter"
+   import "github.com/your-username/ipfilter"
    ```
 
 2. Create a new IPFilter instance:
    ```go
-   filter := ipfilter.NewIPFilter("redis:6379")
-   ```
-   or
-   ```go
-   filter := ipfilter.NewIPFilter("redis:6379", "my_rules")
-   ```
-
-3. Add rules:
-   ```go
-   rule := ipfilter.Rule{Action: "allow", Target: "203.0.113.0/24"}
-   filter.AppendRule(rule)
+   jsonRules := `[{"action":"allow","target":"203.0.113.0/24"}]`
+   filter, err := ipfilter.NewIPFilter(jsonRules)
+   if err != nil {
+       // Handle error
+   }
    ```
 
-4. Check if an IP is allowed:
+3. Check if an IP is allowed:
    ```go
    allowed, err := filter.IsAllowedIP("203.0.113.100")
    if err != nil {
@@ -87,145 +80,55 @@ To use this package in your Go project:
    }
    ```
 
-5. Set a custom Redis key
+4. Add a new rule:
    ```go
-   filter := ipfilter.NewIPFilter("redis:6379", "my_rules")
+   rule := ipfilter.Rule{Action: "allow", Target: "192.0.2.0/24"}
+   err := filter.AppendRule(rule)
+   if err != nil {
+       // Handle error
+   }
    ```
 
-## Installation and Running (Without Docker)
+5. Convert rules to JSON:
+   ```go
+   jsonRules, err := filter.ToJSON()
+   if err != nil {
+       // Handle error
+   }
+   ```
+
+## Installation
 
 ### Prerequisites
-- Go 1.19 or later
-- Redis
+- Go 1.13 or later
 
-### MacOS
+### Steps
 
-1. Install Go 1.19 or later:
-   ```
-   brew install go@1.19
-   ```
-   Note: If you need a more recent version, you can use `brew install go` instead.
+1. Install Go 1.13 or later (if not already installed)
 
-2. Install Redis:
+2. Clone the repository:
    ```
-   brew install redis
-   ```
-
-3. Start Redis:
-   ```
-   brew services start redis
-   ```
-
-4. Clone the repository:
-   ```
-   git clone https://github.com/mike-plivo/ipfilter.git
+   git clone https://github.com/your-username/ipfilter.git
    cd ipfilter
    ```
 
-5. Install dependencies:
+3. Install dependencies:
    ```
    go mod download
    ```
 
-6. Run tests:
+4. Run tests:
    ```
    go test ./...
    ```
 
-### Linux (Debian/Ubuntu)
+## Testing
 
-1. Install Go 1.19 or later:
-   ```
-   sudo add-apt-repository ppa:longsleep/golang-backports
-   sudo apt update
-   sudo apt install golang-go
-   ```
-   Note: This method installs the latest stable version of Go. Verify the version with `go version` after installation.
-
-2. Install Redis:
-   ```
-   sudo apt install redis-server
-   ```
-
-3. Start Redis:
-   ```
-   sudo systemctl start redis-server
-   ```
-
-4. Clone the repository:
-   ```
-   git clone https://github.com/mike-plivo/ipfilter.git
-   cd ipfilter
-   ```
-
-5. Install dependencies:
-   ```
-   go mod download
-   ```
-
-6. Run tests:
-   ```
-   go test .
-   ```
-
-## Running Tests with Docker
-
-This project includes a Docker setup to easily run all test cases in an isolated environment. Here's how to use it:
-
-1. Ensure you have Docker installed on your system.
-
-2. Navigate to the directory containing the `Dockerfile`.
-
-3. Build the Docker image:
-   ```
-   docker build -t ipfilter-test .
-   ```
-
-4. Run the tests using Docker:
-   ```
-   docker run --rm ipfilter-test
-   ```
-
-This setup will:
-- Build a Docker image for the application, including all dependencies.
-- Run all the test cases in the container.
-- Display the test results in the console.
-
-The `Dockerfile` should be configured to:
-- Install necessary dependencies.
-- Copy the application code into the container.
-- Set up and run Redis within the container.
-- Set the necessary environment variables for the tests.
-- Run the tests as the default command.
-
-After the tests complete, the container will stop and remove itself automatically. You can view the test results in the console output.
-
-## Other commands with Docker
-
-### Run benchmarks
-```
-docker run --rm ipfilter-test bench
-```
-
-### Run examples
-```
-docker run --rm ipfilter-test examples
-```
-
-### Run shell
-```
-docker run --rm -ti ipfilter-test shell
-```
-
-## Testing locally without Docker
-
-To run tests for this package locally, you can use the standard Go testing tools. Make sure you have a Redis instance running locally.
+To run tests for this package, you can use the standard Go testing tools:
 
 ```
-go test .
+go test ./...
 ```
-
-Alternatively, you can use the Docker setup described above to run tests in an isolated environment.
 
 ## Contributing
 

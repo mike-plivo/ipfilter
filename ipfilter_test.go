@@ -270,12 +270,13 @@ func TestExtendedIPFilter(t *testing.T) {
 			expected: []bool{false, false, true, true},
 		},
 		{
-			name: "Localhost is always denied",
+			name: "Localhost is allowed",
 			rules: `[
-				{"action": "allow", "target": "all"}
+				{"action": "allow", "target": "127.0.0.1/32"},
+				{"action": "allow", "target": "::1/128"}
 			]`,
 			testIPs:  []string{"127.0.0.1", "::1"},
-			expected: []bool{false, false},
+			expected: []bool{true, true},
 		},
 		{
 			name: "Large IPv4 range",
@@ -365,8 +366,8 @@ func TestExtendedIPFilter(t *testing.T) {
 				if err != nil {
 					t.Errorf("IsAllowedIP failed for %s: %v", tc.ip, err)
 				}
-				if allowed {
-					t.Errorf("Expected IP %s to be denied even with 'allow all' rule", tc.ip)
+				if allowed == false {
+					t.Errorf("Expected IP %s to be allowed", tc.ip)
 				}
 			})
 		}

@@ -7,50 +7,6 @@ import (
 	"strings"
 )
 
-// allBlocks contains all private and special IP ranges
-var allBlocks []*net.IPNet
-
-func init() {
-	blocks := []string{
-		// IPv4 private ranges
-		"10.0.0.0/8",
-		"172.16.0.0/12",
-		"192.168.0.0/16",
-		// IPv6 private ranges
-		"fc00::/7",   // Unique Local Addresses
-		"fe80::/10",  // Link-Local Addresses
-		// IPv4 special ranges
-		"100.64.0.0/10",      // Shared address space
-		"127.0.0.0/8",        // Loopback
-		"169.254.0.0/16",     // Link-local
-		"192.0.0.0/24",       // IETF Protocol Assignments
-		"192.0.2.0/24",       // TEST-NET-1
-		"192.88.99.0/24",     // 6to4 Relay Anycast
-		"198.18.0.0/15",      // Network benchmark tests
-		"198.51.100.0/24",    // TEST-NET-2
-		"203.0.113.0/24",     // TEST-NET-3
-		"224.0.0.0/4",        // Multicast
-		"240.0.0.0/4",        // Reserved for future use
-		"255.255.255.255/32", // Broadcast
-		// IPv6 special ranges
-		"::1/128",            // Loopback
-		"64:ff9b::/96",       // IPv4-IPv6 Translation
-		"100::/64",           // Discard-Only Address Block
-		"2001::/32",          // TEREDO
-		"2001:20::/28",       // ORCHIDv2
-		"2001:db8::/32",      // Documentation
-		"2002::/16",          // 6to4
-		"ff00::/8",           // Multicast
-	}
-
-	for _, block := range blocks {
-		_, ipNet, err := net.ParseCIDR(block)
-		if err != nil {
-			panic(fmt.Sprintf("Invalid CIDR block: %s", block))
-		}
-		allBlocks = append(allBlocks, ipNet)
-	}
-}
 
 // Rule represents an IP filtering rule
 type Rule struct {
@@ -93,11 +49,6 @@ func (f *IPFilter) IsAllowedIP(ip string) (bool, error) {
 	// If no rules are set, allow all
 	if len(f.rules) == 0 {
 		return true, nil
-	}
-
-	// Add a check for private or special IP addresses
-	if IsPrivateOrSpecialIP(ipAddr) {
-		return false, nil
 	}
 
 	for _, rule := range f.rules {
@@ -195,18 +146,7 @@ func (f *IPFilter) ToJSON() (string, error) {
 	return string(jsonData), nil
 }
 
-// IsPrivateOrSpecialIP checks if the given IP is private or in a special block
-func IsPrivateOrSpecialIP(ip net.IP) bool {
-	for _, ipNet := range allBlocks {
-		if ipNet.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
 // Convenience methods for IPFilter to delegate to Slice
-
 func (f *IPFilter) AppendRule(rule Rule) error {
 	return f.rules.Append(rule)
 }

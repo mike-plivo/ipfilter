@@ -27,16 +27,6 @@ When an IP address is checked against the filter:
 5. If the IP matches a rule, no other rules are checked.
 6. If the IP does not match any rule, the IP is denied by default.
 
-### Private and Special IP Filtering
-
-The package includes a function `IsPrivateOrSpecialIP` that automatically checks if an IP address falls within private or special ranges. This includes:
-
-- IPv4 private ranges
-- IPv6 private ranges
-- Special purpose IP ranges (e.g., loopback, multicast, reserved)
-
-This function is used in the `IsAllowedIP` method to automatically deny access to these IP ranges, enhancing security by default.
-
 ### Rule Management
 
 The package provides methods to:
